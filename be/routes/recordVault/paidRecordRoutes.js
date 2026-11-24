@@ -294,16 +294,19 @@ export async function postPaidRecordEnsure(req, res) {
     const singlesId = requireSinglesId(req);
     const body = req.body || {};
     const kind = String(body.kind || body.schedule_kind || '').trim().toLowerCase();
-    if (kind !== 'monthly' && kind !== 'yearly' && kind !== 'subscription') {
-      throw httpError(400, 'kind must be monthly, yearly, or subscription');
+    if (kind !== 'monthly' && kind !== 'yearly' && kind !== 'subscription' && kind !== 'todo') {
+      throw httpError(400, 'kind must be monthly, yearly, subscription, or todo');
     }
     const storageBackend = parseBillStorageBackend(
       body.storageType ?? body.storage_backend ?? readBillStorageBackend(req)
     );
     const year = toInt(body.year ?? body.bill_year);
     const rowIndex = toInt(body.row_index);
-    if (!year || year < 2000 || year > 2100) throw httpError(400, 'year must be 2000–2100');
-    if (!rowIndex || rowIndex < 1) throw httpError(400, 'row_index must be >= 1');
+    // ToDo tasks have no bill row / calendar slot — only an optional existing paid_record_id.
+    if (kind !== 'todo') {
+      if (!year || year < 2000 || year > 2100) throw httpError(400, 'year must be 2000–2100');
+      if (!rowIndex || rowIndex < 1) throw httpError(400, 'row_index must be >= 1');
+    }
 
     await client.query('BEGIN');
 
@@ -312,7 +315,26 @@ export async function postPaidRecordEnsure(req, res) {
     let subscriptionBillId = toInt(body.subscription_bill_id);
     let paidRecordId = null;
 
-    if (kind === 'monthly') {
+    if (kind === 'todo') {
+      // Reuse the task's record when it is this user's 'todo' record on the same storage; else create one.
+      // The client stores the returned paid_record_id on the task (todo_item.paid_record_id).
+      const wanted = toInt(body.paid_record_id);
+      if (wanted && wanted > 0) {
+        const existing = await loadPaidRecordOwned(client, wanted, singlesId);
+        if (existing && existing.schedule_kind === 'todo' && existing.storage_backend === storageBackend) {
+          paidRecordId = Number(existing.paid_record_id);
+        }
+      }
+      if (!paidRecordId) {
+        const { rows: created } = await client.query(
+          `INSERT INTO outdateddbsnapshotoct2024.paid_record (singles_id, schedule_kind, storage_backend, notes_text)
+           VALUES ($1, 'todo', $2, '')
+           RETURNING paid_record_id`,
+          [singlesId, storageBackend]
+        );
+        paidRecordId = Number(created[0].paid_record_id);
+      }
+    } else if (kind === 'monthly') {
       const month = toInt(body.month ?? body.bill_month);
       if (!month || month < 1 || month > 12) throw httpError(400, 'month must be 1–12');
       subscriptionBillId = null;

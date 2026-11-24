@@ -22,6 +22,7 @@ import {
 import { recordVaultPopupCloseSx } from './recordVaultPopupCloseSx';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { getHoverMagnifyFactor } from 'config/hoverMagnifyEnv';
+import { captureDisplayWindowAsPngFile } from 'utils/captureDisplayWindowPng';
 import BillReceiptAttachmentPreview from './BillReceiptAttachmentPreview';
 import BillReceiptZoomViewer from './BillReceiptZoomViewer';
 
@@ -87,7 +88,10 @@ const fixedGreenButtonSx = {
 /**
  * Bills/Receipts popup — four equal quadrants (50/50 × 50/50):
  * Notes | BILLS/RECEIPTS upload+thumbs
- * Preview+Download | Phone QR
+ * Preview+Download/Photo/Zoom | Phone QR
+ *
+ * Photo uses getDisplayMedia so the user can snap another window/tab
+ * (e.g. county tax payment receipt) into the same attachment list.
  */
 export default function BillReceiptsPopup({
   open,
@@ -313,6 +317,21 @@ export default function BillReceiptsPopup({
     } finally {
       setBusy(false);
     }
+  };
+
+  /** Photo: pick another window/tab (e.g. tax-collector receipt) → PNG → same upload path as drag/drop. */
+  const handlePhotoCapture = async () => {
+    if (!paidRecordId || busy) return;
+    setError('');
+    let file;
+    try {
+      file = await captureDisplayWindowAsPngFile();
+    } catch (err) {
+      if (err?.code === 'CAPTURE_CANCELLED') return;
+      setError(err?.message || 'Screen capture failed');
+      return;
+    }
+    await handleFiles([file]);
   };
 
   const selected = attachments.find((a) => a.attachmentId === selectedId) || null;
@@ -646,7 +665,7 @@ export default function BillReceiptsPopup({
                       })}
                     </Box>
                   ) : null}
-                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', gap: 2, flexShrink: 0 }}>
+                  <Box sx={{ p: 1, display: 'flex', justifyContent: 'flex-start', gap: 2, flexShrink: 0, flexWrap: 'wrap' }}>
                     <ColorTemplate13DisableGreenButton
                       type="button"
                       disabled={!selected || !paidRecordId}
@@ -660,6 +679,15 @@ export default function BillReceiptsPopup({
                       }}
                     >
                       Download
+                    </ColorTemplate13DisableGreenButton>
+                    <ColorTemplate13DisableGreenButton
+                      type="button"
+                      disabled={uploadDisabled}
+                      onClick={() => void handlePhotoCapture()}
+                      title="Capture another window or browser tab (e.g. payment receipt) as a photo"
+                      sx={fixedGreenButtonSx}
+                    >
+                      Photo
                     </ColorTemplate13DisableGreenButton>
                     <ColorTemplate13DisableGreenButton
                       type="button"

@@ -22,7 +22,7 @@ ALTER TABLE outdateddbsnapshotoct2024.yearly_bill
   ADD CONSTRAINT yearly_bill_bill_period_check
   CHECK (
     bill_period IS NULL
-    OR bill_period IN ('Monthly', 'BiYearly', 'Quarterly', '2Year')
+    OR bill_period IN ('Monthly', 'Yearly', 'BiYearly', 'Quarterly', '2Year')
   );
 
 COMMENT ON COLUMN outdateddbsnapshotoct2024.yearly_bill.bill_period IS

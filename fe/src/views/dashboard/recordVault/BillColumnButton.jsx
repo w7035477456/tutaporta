@@ -15,7 +15,15 @@ const DROP_GREEN = '#2e7d32';
  * then red receipt (note) icon. Hover enlarges (HOVER_MAGNIFY_FACTOR).
  * When onDropAttach is set, Mobile Upload thumbnails / computer files can be dropped on it.
  */
-export default function BillColumnButton({ hasContent = false, onClick, onDropAttach, disabled = false, title }) {
+export default function BillColumnButton({
+  hasContent = false,
+  onClick,
+  onDropAttach,
+  disabled = false,
+  title,
+  /** Circle outline colour. When set, it is forced (!important) so theme/button resets can't hide it. */
+  borderColor
+}) {
   const scale = getHoverMagnifyFactor();
   const [dropActive, setDropActive] = useState(false);
   const dragDepthRef = useRef(0);
@@ -74,7 +82,10 @@ export default function BillColumnButton({ hasContent = false, onClick, onDropAt
         width: 36,
         height: 36,
         borderRadius: '50%',
-        border: `2px solid ${dropActive ? DROP_GREEN : BILL_SCHEDULE_INK}`,
+        border: borderColor
+          ? `2px solid ${dropActive ? DROP_GREEN : borderColor} !important`
+          : `2px solid ${dropActive ? DROP_GREEN : BILL_SCHEDULE_INK}`,
+        ...(borderColor ? { boxSizing: 'border-box' } : null),
         boxShadow: dropActive ? `0 0 0 3px ${DROP_GREEN}` : 'none',
         bgcolor: noteStyle ? RED : BILL_SCHEDULE_SURFACE,
         color: noteStyle ? '#fff' : BILL_SCHEDULE_INK,
@@ -111,5 +122,6 @@ BillColumnButton.propTypes = {
   onClick: PropTypes.func,
   onDropAttach: PropTypes.func,
   disabled: PropTypes.bool,
-  title: PropTypes.string
+  title: PropTypes.string,
+  borderColor: PropTypes.string
 };

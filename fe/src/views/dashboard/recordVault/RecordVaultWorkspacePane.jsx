@@ -51,7 +51,11 @@ import RecordVaultSearchBar from './RecordVaultSearchBar';
 import { normalizeMynoteFontSizeTenths, recordVaultMenuButtonFontRemFromTenths } from 'config/recordVaultMenuButtonFontEnv';
 import { getVaultDefaultButtonFontSizeRem } from 'config/vaultDefaultButtonFontSizeEnv';
 import { fetchUserCustomization, saveUserCustomization } from 'api/userCustomizationFe';
-import { RecordVaultSliderControlButtonProvider } from './RecordVaultSliderControlButtonContext';
+import {
+  RecordVaultSliderControlButtonProvider,
+  useRecordVaultSliderControlButtonFontConfig
+} from './RecordVaultSliderControlButtonContext';
+import { useListFontPct } from './recordVaultListFontScale';
 import { useRecordVaultPaneStorageType } from './RecordVaultPaneContext';
 import BusyHourglassOverlay from 'ui-component/BusyHourglassOverlay';
 import { BUSY_HOURGLASS_MY_NOTE_SIZE } from 'config/busyHourglassEnv';
@@ -718,6 +722,30 @@ const columnResizeHandleSx = {
   '&:hover': { bgcolor: 'rgba(255,255,255,0.18)' }
 };
 
+/** Visible drag bar (grey with a grip, yellow on hover) — vertical or horizontal. */
+function resizeBarSx(orientation) {
+  const vertical = orientation === 'vertical';
+  return {
+    flex: '0 0 auto',
+    position: 'relative',
+    touchAction: 'none',
+    bgcolor: '#9e9e9e',
+    cursor: vertical ? 'col-resize' : 'row-resize',
+    ...(vertical ? { width: 8, alignSelf: 'stretch' } : { height: 10, width: '100%' }),
+    '&::after': {
+      content: '""',
+      position: 'absolute',
+      left: '50%',
+      top: '50%',
+      transform: 'translate(-50%, -50%)',
+      borderRadius: 2,
+      bgcolor: '#000',
+      ...(vertical ? { width: 2, height: 36 } : { width: 36, height: 2 })
+    },
+    '&:hover, &:active': { bgcolor: '#FFEB3B' }
+  };
+}
+
 function loadStoredNoteFontStyleIndex() {
   try {
     const raw = localStorage.getItem(NOTE_FONT_STYLE_LS_KEY);
@@ -912,14 +940,29 @@ function reorderById(items, fromId, toId, idKey) {
   return next;
 }
 
-function ColumnResizeHandle({ onMouseDown, sx }) {
+function ColumnResizeHandle({ onMouseDown, sx, visible = false }) {
   return (
     <Box
       role="separator"
       aria-orientation="vertical"
       aria-label="Resize column"
+      title={visible ? 'Drag to resize' : undefined}
       onMouseDown={onMouseDown}
-      sx={{ ...columnResizeHandleSx, ...sx }}
+      sx={{ ...(visible ? resizeBarSx('vertical') : columnResizeHandleSx), ...sx }}
+    />
+  );
+}
+
+/** Horizontal drag bar between two stacked panes (e.g. Shortcut over Recent). */
+function RowResizeHandle({ onMouseDown, sx }) {
+  return (
+    <Box
+      role="separator"
+      aria-orientation="horizontal"
+      aria-label="Resize panes"
+      title="Drag up or down to resize"
+      onMouseDown={onMouseDown}
+      sx={{ ...resizeBarSx('horizontal'), my: 0.5, ...sx }}
     />
   );
 }
@@ -1148,6 +1191,21 @@ function MenuRowWithDelete({
   );
 }
 
+/**
+ * Applies the "Font: + −" list scale to SliderControlButtons inside (Notebook / Note / Shortcut /
+ * Recent labels). At 100% it renders children untouched so the default sizing is unchanged.
+ */
+function ListFontScaleProvider({ exempt = false, children }) {
+  const pct = useListFontPct();
+  const base = useRecordVaultSliderControlButtonFontConfig();
+  if (exempt || pct === 100) return children;
+  return (
+    <RecordVaultSliderControlButtonProvider fontRem={(Number(base.fontRem) || 1) * (pct / 100)} followEnvVw={false}>
+      {children}
+    </RecordVaultSliderControlButtonProvider>
+  );
+}
+
 function MenuRowButton({
   selected,
   selectedBlue = false,
@@ -1159,6 +1217,8 @@ function MenuRowButton({
   className,
   draggable,
   onKeyDown,
+  /** Skip the list Font +/- scale (Bill Schedule Monthly / Yearly / Subscription / ToDo). */
+  listFontExempt = false,
   ...rest
 }) {
   const useDivDragSurface = Boolean(draggable);
@@ -1178,6 +1238,7 @@ function MenuRowButton({
         : undefined;
   const forceFg = searchHitBlue ? '#ffffff' : '#000000';
   return (
+    <ListFontScaleProvider exempt={listFontExempt}>
     <SliderControlButton
       {...rest}
       variant="green"
@@ -1216,6 +1277,7 @@ function MenuRowButton({
     >
       {children}
     </SliderControlButton>
+    </ListFontScaleProvider>
   );
 }
 
@@ -1454,6 +1516,7 @@ function RenamableDraggableMenuRow({
           selectedBlue={selectedBlue}
           multiSelected={multiSelected}
           locked={locked}
+          listFontExempt={isBillScheduleSystemId(id)}
           draggable={!disabled}
           title={locked ? 'Locked — enter PIN to view' : buttonTitle || dragTitle || 'Drag to reorder; double-click to rename'}
           onPointerDown={handleRowPointerDown}
@@ -4474,6 +4537,37 @@ export default function RecordVaultWorkspacePane({
     [updateOpenNoteTitle, editingNoteId, selectedNoteId, renameUiSurface]
   );
 
+  /** Drag the bar between Shortcut and Recent: Shortcut gets `shortcutPanePercent` of the column height. */
+  const startShortcutPaneResize = useCallback(
+    (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const column = event.currentTarget.parentElement;
+      if (!column) return;
+      const rect = column.getBoundingClientRect();
+      const onMove = (moveEvent) => {
+        if (rect.height <= 0) return;
+        const pct = ((moveEvent.clientY - rect.top) / rect.height) * 100;
+        setShortcutPanePercent(clamp(pct, MIN_SHORTCUT_PANE_PERCENT, MAX_SHORTCUT_PANE_PERCENT));
+      };
+      const onUp = () => {
+        document.body.style.removeProperty('user-select');
+        document.body.style.removeProperty('cursor');
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        setShortcutPanePercent((shortcutPercent) => {
+          writeStoredLayout({ sidebarWidth, notebookColWidth, rightSidebarWidth, shortcutPanePercent: shortcutPercent });
+          return shortcutPercent;
+        });
+      };
+      document.body.style.userSelect = 'none';
+      document.body.style.cursor = 'row-resize';
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [notebookColWidth, rightSidebarWidth, sidebarWidth]
+  );
+
   const startColumnResize = useCallback(
     (mode, event) => {
       event.preventDefault();
@@ -7109,6 +7203,8 @@ export default function RecordVaultWorkspacePane({
                   bgcolor: 'var(--theme-secondary-color)'
                 }}
               >
+                {/* Font +/- also scales the menu row (File … AI LLM RAG). */}
+                <ListFontScaleProvider>
                 <Box
                   {...guestDemoAllowProps()}
                   sx={{
@@ -7462,6 +7558,7 @@ export default function RecordVaultWorkspacePane({
                     </Box>
                   ) : null}
                 </Box>
+                </ListFontScaleProvider>
                 {/* Task 2: push the (smaller) Mobile Upload tray flush right. */}
                 <Box sx={{ flex: '1 1 0', minWidth: 0 }} aria-hidden />
                 {!compareMode ? (
@@ -7516,6 +7613,8 @@ export default function RecordVaultWorkspacePane({
                   bgcolor="#000"
                   sx={{ flex: '0 0 auto' }}
                 />
+                {/* Font +/- also scales the yellow search-result note titles. */}
+                <ListFontScaleProvider>
                 <Box
                   aria-label="Search results"
                   sx={{
@@ -7671,6 +7770,7 @@ export default function RecordVaultWorkspacePane({
                     </Typography>
                   ) : null}
                 </Box>
+                </ListFontScaleProvider>
               </Box>
             ) : null}
 
@@ -8367,6 +8467,7 @@ export default function RecordVaultWorkspacePane({
                         if (isBillTodoView) {
                           return (
                             <BillScheduleTodoPanel
+                              storageType={paneStorageType}
                               videoTutorialUrl={videoTutorialUrl}
                               onBillScheduleTutorialClick={() => setBillScheduleTutorialOpen(true)}
                               headerRightAction={billFocusToggle}
@@ -8640,7 +8741,8 @@ export default function RecordVaultWorkspacePane({
                     <>
                       {!compareMode ? (
                         <ColumnResizeHandle
-                          sx={{ display: { xs: 'none', md: 'block' }, bgcolor: 'var(--theme-primary-color)', opacity: 0.35 }}
+                          visible
+                          sx={{ display: { xs: 'none', md: 'block' } }}
                           onMouseDown={(e) => startColumnResize('rightSidebar', e)}
                         />
                       ) : null}
@@ -8675,7 +8777,7 @@ export default function RecordVaultWorkspacePane({
                             ref={shortcutLaneRef}
                             sx={{
                               ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
-                              flex: '1 1 0',
+                              flex: recentNoteSlots && !compareMode ? `${shortcutPanePercent} 1 0` : '1 1 0',
                               minHeight: compact ? 64 : 100
                             }}
                             onDragOver={(e) => {
@@ -8807,6 +8909,10 @@ export default function RecordVaultWorkspacePane({
                             </Box>
                           </Box>
                           {recentNoteSlots && !compareMode ? (
+                            <RowResizeHandle onMouseDown={startShortcutPaneResize} />
+                          ) : null}
+                          {recentNoteSlots && !compareMode ? (
+                            <ListFontScaleProvider>
                             <RecentNoteQuickSlots
                               orientation="vertical"
                               slots={recentNoteSlots}
@@ -8816,12 +8922,12 @@ export default function RecordVaultWorkspacePane({
                               disabled={busy || innerEncryptBusy}
                               sx={{
                                 ...(compact ? menuColumnShellContentCompactSx : menuColumnShellContentSx),
-                                flex: '1 1 0',
+                                flex: `${100 - shortcutPanePercent} 1 0`,
                                 minHeight: compact ? 64 : 100,
-                                mt: 1,
                                 overflow: 'hidden'
                               }}
                             />
+                            </ListFontScaleProvider>
                           ) : null}
                         </Box>
                       </Box>

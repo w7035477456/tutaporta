@@ -18,7 +18,7 @@ BEGIN
   ) THEN
     ALTER TABLE outdateddbsnapshotoct2024.yearly_bill
       ADD CONSTRAINT yearly_bill_bill_period_check
-      CHECK (bill_period IS NULL OR bill_period IN ('Monthly', 'BiYearly', 'Quarterly', '2Year'));
+      CHECK (bill_period IS NULL OR bill_period IN ('Monthly', 'Yearly', 'BiYearly', 'Quarterly', '2Year'));
   END IF;
 
   IF NOT EXISTS (

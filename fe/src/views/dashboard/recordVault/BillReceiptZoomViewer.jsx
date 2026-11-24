@@ -3,7 +3,6 @@ import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import Typography from '@mui/material/Typography';
-import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
 import { SLIDER_CONTROL_TRUE_YELLOW } from 'ui-component/SliderControlButton';
 import { COLOR_TEMPLATE7_POPUP_Z_INDEX } from 'config/colorTemplate7PopupLargeDark';
 import { getPaidRecordAttachmentPreviewKind, paidRecordAttachmentUrl } from 'api/paidRecordFe';
@@ -33,6 +32,24 @@ const zoomButtonSx = {
   justifyContent: 'center',
   '&:disabled': { opacity: 0.45, cursor: 'default' },
   '&:hover:not(:disabled)': { filter: 'brightness(1.08)' }
+};
+
+/** Standard exit chrome: true red (not theme-remapped) with black text + border, so it always reads on the dark backdrop. */
+const EXIT_RED = '#e60000';
+const exitChromeSx = {
+  border: '3px solid #000 !important',
+  borderRadius: 1,
+  bgcolor: `${EXIT_RED} !important`,
+  color: '#000 !important',
+  WebkitTextFillColor: '#000 !important',
+  fontWeight: 900,
+  lineHeight: 1,
+  cursor: 'pointer',
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  boxShadow: '0 0 0 2px #fff',
+  '&:hover': { filter: 'brightness(1.1)' }
 };
 
 function clampZoom(z) {
@@ -144,14 +161,38 @@ export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, att
         <Box
           sx={{
             flex: `0 0 ${TOOLBAR_PX}px`,
+            position: 'relative',
+            zIndex: 2,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 1.5
+            gap: 1.5,
+            bgcolor: '#000'
           }}
         >
+          {/* Top middle: obvious Exit (Esc also closes). */}
+          <Box
+            component="button"
+            type="button"
+            onClick={onClose}
+            aria-label="Exit zoom"
+            title="Exit zoom (Esc)"
+            sx={{ ...exitChromeSx, height: 48, px: 3, fontSize: '1.6rem' }}
+          >
+            Exit
+          </Box>
           {isImage ? (
-            <>
+            <Box
+              sx={{
+                position: 'absolute',
+                left: 16,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5
+              }}
+            >
               <Box
                 component="button"
                 type="button"
@@ -190,9 +231,19 @@ export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, att
               >
                 +
               </Box>
-            </>
+            </Box>
           ) : null}
-          <ColorTemplate6CloseX onClose={onClose} aria-label="Close zoom" positionSx={{ position: 'absolute', top: 10, right: 16 }} />
+          {/* Top right: standard red box with black X. */}
+          <Box
+            component="button"
+            type="button"
+            onClick={onClose}
+            aria-label="Close zoom"
+            title="Close (Esc)"
+            sx={{ ...exitChromeSx, position: 'absolute', top: 8, right: 16, width: 48, height: 48, p: 0, fontSize: '1.8rem' }}
+          >
+            X
+          </Box>
         </Box>
         <Box
           ref={measureStage}

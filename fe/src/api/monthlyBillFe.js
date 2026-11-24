@@ -140,3 +140,15 @@ export async function transferBillSchedule({
     throw e;
   }
 }
+
+/** GET ToDo board tasks ({ items: [{ todo_item_id, lane, seq, body }] }). */
+export async function fetchTodoItems({ storageType } = {}) {
+  const { data } = await api.get('/api/todoItems', { params: withStorage({}, storageType) });
+  return data;
+}
+
+/** Full-replace save of the ToDo board; array order within each lane is the sequence. */
+export async function saveTodoItems(items, { storageType } = {}) {
+  const { data } = await api.put('/api/todoItems', { ...withStorage({ items }, storageType) });
+  return data;
+}

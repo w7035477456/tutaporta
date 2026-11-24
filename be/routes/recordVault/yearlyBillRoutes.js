@@ -92,7 +92,7 @@ function normalizeAction(billType, raw) {
   return null;
 }
 
-const BILL_PERIODS = new Set(['Monthly', 'BiYearly', 'Quarterly', '2Year']);
+const BILL_PERIODS = new Set(['Monthly', 'Yearly', 'BiYearly', 'Quarterly', '2Year']);
 const BILL_SOURCES = new Set(['Visa', 'Check', 'Other']);
 
 function normalizeBillPeriod(raw) {
@@ -101,6 +101,7 @@ function normalizeBillPeriod(raw) {
   if (BILL_PERIODS.has(s)) return s;
   const lower = s.toLowerCase();
   if (lower === 'monthly') return 'Monthly';
+  if (lower === 'yearly' || lower === 'annual' || lower === 'annually') return 'Yearly';
   if (lower === 'biyearly' || lower === 'bi-yearly' || lower === 'bi yearly') return 'BiYearly';
   if (lower === 'quarterly') return 'Quarterly';
   if (

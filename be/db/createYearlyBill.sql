@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS outdateddbsnapshotoct2024.yearly_bill (
   bill_type text NOT NULL DEFAULT 'Manual'
     CHECK (bill_type IN ('Auto', 'Manual')),
   bill_period text NULL
-    CHECK (bill_period IS NULL OR bill_period IN ('Monthly', 'BiYearly', 'Quarterly', '2Year')),
+    CHECK (bill_period IS NULL OR bill_period IN ('Monthly', 'Yearly', 'BiYearly', 'Quarterly', '2Year')),
   bill_source text NULL
     CHECK (bill_source IS NULL OR bill_source IN ('Visa', 'Check', 'Other')),
   -- Due calendar year when bill_period = 2Year (Due Date = year + month + day)

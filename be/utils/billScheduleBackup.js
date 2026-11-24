@@ -384,7 +384,7 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       const billType = r?.bill_type === 'Auto' ? 'Auto' : 'Manual';
       const oldPaidId = toIntOrNull(r?.paid_record_id);
       const billPeriodRaw = String(r?.bill_period ?? '').trim();
-      const billPeriod = ['Monthly', 'BiYearly', 'Quarterly', '2Year'].includes(billPeriodRaw)
+      const billPeriod = ['Monthly', 'Yearly', 'BiYearly', 'Quarterly', '2Year'].includes(billPeriodRaw)
         ? billPeriodRaw
         : null;
       const billSourceRaw = String(r?.bill_source ?? '').trim();

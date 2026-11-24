@@ -62,6 +62,7 @@ import {
   formatUsbWorkspaceTitle
 } from './tutaNotesBranding';
 import { clearTutaNotesTutorialChrome } from './tutaNotesTutorialChrome';
+import { RecordVaultListFontControl } from './recordVaultListFontScale';
 
 const myNoteLoadingBackdropSx = {
   bgcolor: 'rgba(0, 0, 0, 0.35)'
@@ -218,7 +219,7 @@ const storageTabStripSx = (stripColor) => ({
   overflow: 'visible'
 });
 
-function PaneHeader({ title, logoSrc, titleTooltip, stripColor, titleColor }) {
+function PaneHeader({ title, logoSrc, titleTooltip, stripColor, titleColor, rightSlot = null }) {
   const stripTitleColor = titleColor || 'var(--theme-yellow-color)';
   return (
     <Box
@@ -259,6 +260,7 @@ function PaneHeader({ title, logoSrc, titleTooltip, stripColor, titleColor }) {
           />
         </Box>
       </Tooltip>
+      {rightSlot}
     </Box>
   );
 }
@@ -914,6 +916,7 @@ export default function MyRecordVault() {
                     logoSrc={TUTANOTES_CLOUD_LOGO}
                     titleTooltip={TUTANOTES_CLOUD_PANE_TOOLTIP}
                     stripColor={showCompare ? cloudTabColor : undefined}
+                    rightSlot={tutaCloudUnlocked && !showCompare ? <RecordVaultListFontControl /> : null}
                   />
                 ) : null}
                 <Box

@@ -59,7 +59,7 @@ BEGIN
     CONSTRAINT yearly_bill__mac_order_bill_month_check
       CHECK (bill_month IS NULL OR (bill_month >= 1 AND bill_month <= 12)),
     CONSTRAINT yearly_bill__mac_order_bill_period_check
-      CHECK (bill_period IS NULL OR bill_period = ANY (ARRAY['Monthly'::text, 'BiYearly'::text, 'Quarterly'::text, '2Year'::text])),
+      CHECK (bill_period IS NULL OR bill_period = ANY (ARRAY['Monthly'::text, 'Yearly'::text, 'BiYearly'::text, 'Quarterly'::text, '2Year'::text])),
     CONSTRAINT yearly_bill__mac_order_bill_source_check
       CHECK (bill_source IS NULL OR bill_source = ANY (ARRAY['Visa'::text, 'Check'::text, 'Other'::text])),
     CONSTRAINT yearly_bill__mac_order_bill_type_check

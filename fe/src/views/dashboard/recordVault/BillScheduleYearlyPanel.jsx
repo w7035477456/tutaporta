@@ -75,9 +75,15 @@ const MONTH_NAMES = [
   'December'
 ];
 const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const BILL_PERIOD_OPTIONS = ['Monthly', 'BiYearly', 'Quarterly', '2Year'];
+const BILL_PERIOD_OPTIONS = ['Monthly', 'Yearly', 'BiYearly', 'Quarterly', '2Year'];
 /** Stored value → Period dropdown label. */
-const BILL_PERIOD_LABEL = { Monthly: 'Monthly', BiYearly: 'BiYearly', Quarterly: 'Quarterly', '2Year': '2-year' };
+const BILL_PERIOD_LABEL = {
+  Monthly: 'Monthly',
+  Yearly: 'Yearly',
+  BiYearly: 'BiYearly',
+  Quarterly: 'Quarterly',
+  '2Year': '2-year'
+};
 const BILL_SOURCE_OPTIONS = ['Visa', 'Check', 'Other'];
 const TONE_RANK = { overdue: 4, paid: 3, auto: 2, upcoming: 1, none: 0 };
 
