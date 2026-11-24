@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import useExitNavigation from 'utils/useExitNavigation';
 
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -24,8 +25,7 @@ import { getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv
 // ================================|| TERMS AND CONDITIONS ||================================ //
 
 export default function TermsAndConditions() {
-  const navigate = useNavigate();
-  const handleReturn = () => navigate(-1);
+  const handleExit = useExitNavigation();
 
   const returnButtonSx = {
     ...authButtonBoldSx,
@@ -54,8 +54,8 @@ export default function TermsAndConditions() {
                   </Link>
                 </Box>
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mb: 0.5 }}>
-                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx} data-guest-demo-allow="true">
-                    Return
+                  <Button variant="outlined" onClick={handleExit} sx={returnButtonSx} data-guest-demo-allow="true">
+                    Exit
                   </Button>
                 </Box>
                 <Typography
@@ -152,8 +152,8 @@ export default function TermsAndConditions() {
                   © 2026 <strong>TutaMall.com</strong>. All Rights Reserved. (Including <strong>TutaDates</strong> Services)
                 </Typography>
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center', mt: 1 }}>
-                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx} data-guest-demo-allow="true">
-                    Return
+                  <Button variant="outlined" onClick={handleExit} sx={returnButtonSx} data-guest-demo-allow="true">
+                    Exit
                   </Button>
                 </Box>
                   </Stack>

@@ -539,7 +539,7 @@ export default function AuthRegister() {
               component="a"
               href="/pages/termsAndConditions"
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               variant="body2"
               sx={registerConsentLinkSx}
             >
@@ -550,7 +550,7 @@ export default function AuthRegister() {
               component="a"
               href="/pages/privacyPolicy"
               target="_blank"
-              rel="noopener noreferrer"
+              rel="noopener"
               variant="body2"
               sx={registerConsentLinkSx}
             >

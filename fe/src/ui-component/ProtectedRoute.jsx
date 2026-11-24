@@ -51,6 +51,10 @@ const ProtectedRoute = ({ children }) => {
 
   // MainLayout routes (mall, landing, dashboard, …) require a valid session / JWT cookie.
   if (!user) {
+    // Bare domain is public (Twilio toll-free review must not hit a login wall).
+    if (location.pathname === '/') {
+      return <Navigate to="/pages/aboutUs" replace />;
+    }
     return <Navigate to="/pages/login" state={{ from: location }} replace />;
   }
 

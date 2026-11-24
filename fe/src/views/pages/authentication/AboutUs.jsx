@@ -1,4 +1,5 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import useExitNavigation from 'utils/useExitNavigation';
 
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
@@ -23,8 +24,7 @@ import { getMobileSinglesTitleFontSizeVw } from 'config/singlesMemberCardFontEnv
 // ================================|| ABOUT US - OUR VISION & HEART ||================================ //
 
 export default function AboutUs() {
-  const navigate = useNavigate();
-  const handleReturn = () => navigate(-1);
+  const handleExit = useExitNavigation();
 
   const returnButtonSx = {
     ...authButtonBoldSx,
@@ -63,8 +63,8 @@ export default function AboutUs() {
                   </Link>
                 </Box>
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx} data-guest-demo-allow="true">
-                    Return
+                  <Button variant="outlined" onClick={handleExit} sx={returnButtonSx} data-guest-demo-allow="true">
+                    Exit
                   </Button>
                 </Box>
                 <Typography
@@ -116,8 +116,8 @@ export default function AboutUs() {
                   </Stack>
                 </Box>
                 <Box sx={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
-                  <Button variant="outlined" onClick={handleReturn} sx={returnButtonSx} data-guest-demo-allow="true">
-                    Return
+                  <Button variant="outlined" onClick={handleExit} sx={returnButtonSx} data-guest-demo-allow="true">
+                    Exit
                   </Button>
                 </Box>
               </Stack>
