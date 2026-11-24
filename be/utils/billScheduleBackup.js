@@ -1,9 +1,9 @@
 /**
- * Bill Schedule (Monthly / Yearly / Subscription) inside the TutaNotes Cloud backup zip.
+ * Bill Schedule (Monthly / Yearly / Subscription + the ToDo board) inside the TutaNotes Cloud backup zip.
  * Bill rows and Bills/Receipts records live in Postgres and their files under
  * notes/bill_receipts/ — both outside the TutaNotes vault folder — so the zip
  * carries them separately:
- *   bill_schedule.json          rows + paid_record notes + attachment metadata
+ *   bill_schedule.json          rows + todo tasks/dividers + paid_record notes + attachment metadata
  *   bill_receipts/{id}/{file}   receipt files (same relative_path as in Postgres)
  * Only the Cloud side (storage_backend 'tutaCloud') is backed up / restored.
  */
@@ -24,6 +24,7 @@ export const BILL_SCHEDULE_BACKUP_FILE = 'bill_schedule.json';
 /** v2 = monthly/yearly rows include tab_label + soft_delete (required for Medford/Rockfield/… tabs). */
 const BILL_SCHEDULE_BACKUP_VERSION = 2;
 const CLOUD_BACKEND = 'tutaCloud';
+const TODO_LANES = ['repo', 'scheduled', 'done'];
 const BILL_RECEIPTS_PREFIX = 'bill_receipts/';
 
 function safeReceiptRelativePath(raw) {
@@ -86,9 +87,19 @@ export async function exportBillScheduleForBackup(singlesId, notesMount) {
     [singlesId, CLOUD_BACKEND]
   );
 
+  // ToDo board (3 swim lanes): tasks + dividers in lane/seq order.
+  const { rows: todo } = await pool.query(
+    `SELECT kind, lane, seq, body, paid_record_id,
+            to_char(due_date, 'YYYY-MM-DD') AS due_date, done_at, lane_entered_at
+       FROM outdateddbsnapshotoct2024.todo_item
+      WHERE singles_id = $1 AND storage_backend = $2
+      ORDER BY lane, seq`,
+    [singlesId, CLOUD_BACKEND]
+  );
+
   const paidIds = [
     ...new Set(
-      [...monthly, ...yearly, ...subscription]
+      [...monthly, ...yearly, ...subscription, ...todo]
         .map((r) => Number(r.paid_record_id))
         .filter((id) => Number.isFinite(id) && id > 0)
     )
@@ -149,12 +160,13 @@ export async function exportBillScheduleForBackup(singlesId, notesMount) {
     monthly,
     yearly,
     subscription,
+    todo,
     paid_records: paidRecords
   };
   return {
     json: `${JSON.stringify(payload, null, 2)}\n`,
     files,
-    rowCount: monthly.length + yearly.length + subscription.length
+    rowCount: monthly.length + yearly.length + subscription.length + todo.length
   };
 }
 
@@ -192,6 +204,9 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
   const yearly = Array.isArray(payload?.yearly) ? payload.yearly : [];
   const subscription = Array.isArray(payload?.subscription) ? payload.subscription : [];
   const paidRecords = Array.isArray(payload?.paid_records) ? payload.paid_records : [];
+  // Backups made before the ToDo board was zipped have no `todo` key — leave the board as it is.
+  const hasTodo = Array.isArray(payload?.todo);
+  const todo = hasTodo ? payload.todo : [];
 
   // Backups made before tab_label was zipped would collapse Medford/Rockfield/… into home1
   // and hit the unique (tab, year, month, row) key — fail loudly instead of half-restoring.
@@ -226,6 +241,9 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
             UNION
             SELECT paid_record_id FROM outdateddbsnapshotoct2024.subscription_bill
              WHERE singles_id = $1 AND storage_backend = $2 AND paid_record_id IS NOT NULL
+            UNION
+            SELECT paid_record_id FROM outdateddbsnapshotoct2024.todo_item
+             WHERE $3 AND singles_id = $1 AND storage_backend = $2 AND paid_record_id IS NOT NULL
           )
           AND pr.paid_record_id NOT IN (
             SELECT paid_record_id FROM outdateddbsnapshotoct2024.monthly_bill
@@ -236,8 +254,11 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
             UNION
             SELECT paid_record_id FROM outdateddbsnapshotoct2024.subscription_bill
              WHERE singles_id = $1 AND storage_backend <> $2 AND paid_record_id IS NOT NULL
+            UNION
+            SELECT paid_record_id FROM outdateddbsnapshotoct2024.todo_item
+             WHERE singles_id = $1 AND (storage_backend <> $2 OR NOT $3) AND paid_record_id IS NOT NULL
           )`,
-      [singlesId, CLOUD_BACKEND]
+      [singlesId, CLOUD_BACKEND, hasTodo]
     );
     const staleIds = stale.map((r) => Number(r.paid_record_id));
 
@@ -253,6 +274,12 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       `DELETE FROM outdateddbsnapshotoct2024.subscription_bill WHERE singles_id = $1 AND storage_backend = $2`,
       [singlesId, CLOUD_BACKEND]
     );
+    if (hasTodo) {
+      await client.query(
+        `DELETE FROM outdateddbsnapshotoct2024.todo_item WHERE singles_id = $1 AND storage_backend = $2`,
+        [singlesId, CLOUD_BACKEND]
+      );
+    }
     if (staleIds.length) {
       await client.query(
         `DELETE FROM outdateddbsnapshotoct2024.paid_record
@@ -268,8 +295,16 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       const oldId = toIntOrNull(rec?.paid_record_id);
       const kindRaw = String(rec?.schedule_kind || '').toLowerCase();
       const kind =
-        kindRaw === 'yearly' ? 'yearly' : kindRaw === 'subscription' ? 'subscription' : 'monthly';
+        kindRaw === 'yearly'
+          ? 'yearly'
+          : kindRaw === 'subscription'
+            ? 'subscription'
+            : kindRaw === 'todo'
+              ? 'todo'
+              : 'monthly';
       if (!oldId) continue;
+      // ToDo paperclip records are only restored together with the ToDo board.
+      if (kind === 'todo' && !hasTodo) continue;
       const { rows: created } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.paid_record (
            singles_id, schedule_kind, monthly_bill_id, yearly_bill_id, subscription_bill_id, storage_backend,
@@ -447,6 +482,41 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       if (oldPaidId) await linkPaidRecord(oldPaidId, 'subscription', Number(inserted[0].subscription_bill_id));
     }
 
+    // ToDo board: same lane order; seq renumbered 1..n per lane so the unique key always holds.
+    const nextSeq = { repo: 0, scheduled: 0, done: 0 };
+    const todoSorted = [...todo]
+      .filter((r) => TODO_LANES.includes(String(r?.lane)))
+      .sort(
+        (a, b) =>
+          TODO_LANES.indexOf(String(a.lane)) - TODO_LANES.indexOf(String(b.lane)) ||
+          (toIntOrNull(a?.seq) ?? 0) - (toIntOrNull(b?.seq) ?? 0)
+      );
+    for (const r of todoSorted) {
+      const lane = String(r.lane);
+      nextSeq[lane] += 1;
+      const isDivider = r?.kind === 'divider';
+      const oldPaidId = isDivider ? null : toIntOrNull(r?.paid_record_id);
+      const newPaidId = oldPaidId && kindByOldId.get(oldPaidId) === 'todo' ? newIdByOldId.get(oldPaidId) ?? null : null;
+      const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(String(r?.due_date ?? '')) ? String(r.due_date) : null;
+      await client.query(
+        `INSERT INTO outdateddbsnapshotoct2024.todo_item (
+           singles_id, storage_backend, kind, lane, seq, body, paid_record_id, due_date, done_at, lane_entered_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::date, $9::timestamptz, COALESCE($10::timestamptz, now()))`,
+        [
+          singlesId,
+          CLOUD_BACKEND,
+          isDivider ? 'divider' : 'task',
+          lane,
+          nextSeq[lane],
+          isDivider ? '' : String(r?.body ?? '').slice(0, 4000),
+          newPaidId,
+          isDivider ? null : dueDate,
+          !isDivider && lane === 'done' ? r?.done_at ?? null : null,
+          r?.lane_entered_at ?? null
+        ]
+      );
+    }
+
     await client.query('COMMIT');
   } catch (err) {
     try {
@@ -466,6 +536,7 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
     monthlyRows: monthly.length,
     yearlyRows: yearly.length,
     subscriptionRows: subscription.length,
+    todoRows: hasTodo ? todo.length : null,
     paidRecords: restoredPaidRecords,
     attachments: restoredAttachments
   };

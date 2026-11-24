@@ -612,6 +612,7 @@ async function newestBillScheduleChangeMs(singlesId) {
        (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.monthly_bill WHERE singles_id = $1),
        (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.yearly_bill WHERE singles_id = $1),
        (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.subscription_bill WHERE singles_id = $1),
+       (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.todo_item WHERE singles_id = $1),
        (SELECT MAX(GREATEST(created_at, updated_at)) FROM outdateddbsnapshotoct2024.paid_record WHERE singles_id = $1)
      ) AS newest`,
     [singlesId]
