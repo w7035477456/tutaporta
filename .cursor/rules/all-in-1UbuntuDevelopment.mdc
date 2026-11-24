@@ -34,7 +34,11 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 
 - **Every schema change goes in a new file `be/db/migrations/YYYYMMDD_NN_shortName.sql`** (name order = run order; idempotent SQL where possible). Never edit a migration after it has been applied — add a new one.
 - Apply locally with **`dbmigrate`** (`scripts/db-migrate.sh`; `--status` / `--dry-run` change nothing). It records each file in `outdateddbsnapshotoct2024.schema_migrations`, so each runs once per machine.
-- `beall` (Mac) and `scripts/remote-deploy-work2.sh` (Ubuntu deploy, before `febeprod`) run it automatically, so checked-in code brings its schema change with it.
+- Andrew's flow stays **`work1`** (Mac check-in) → **`work2`** (Ubuntu checkout + deploy). Both handle migrations automatically:
+  - **`work1`** (Mac `~/b`) runs `db-migrate.sh` on the Mac and stages `be/db/migrations/` before committing; a failing migration stops `work1` before anything is committed.
+  - **`work2`** (Ubuntu `~/b`) runs `db-migrate.sh` on Ubuntu right before `febeprod`; a failing migration stops the deploy (old build keeps running).
+  - `beall` (Mac) and `scripts/remote-deploy-work2.sh` (`deployall2`) also run it.
+- So the agent's only job is to **write the migration file and run `dbmigrate` on the Mac**; Andrew never runs DDL by hand.
 
 ### Mac ↔ Ubuntu schema parity (required)
 
