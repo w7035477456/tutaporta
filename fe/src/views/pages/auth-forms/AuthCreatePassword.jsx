@@ -1157,48 +1157,13 @@ export default function AuthCreatePassword() {
             </Box>
           </Typography>
 
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
-              flexWrap: 'nowrap',
-              gap: { xs: 0.5, sm: 0.75 },
-              width: '100%',
-              minWidth: 0
-            }}
-          >
-            {[0, 1, 2].map((i) => (
-              <Box
-                key={`passed-${i}`}
-                component="input"
-                readOnly
-                disabled
-                value={codeChars[i]}
-                sx={{
-                  ...verificationSlotInputSx(false, false),
-                  bgcolor: '#f5f5f5',
-                  cursor: 'default'
-                }}
-                aria-label={`Verification code digit ${i + 1} of 6`}
-              />
-            ))}
-            <Box sx={{ width: { xs: 6, sm: 10 }, flexShrink: 0 }} aria-hidden />
-            {[3, 4, 5].map((i) => (
-              <Box
-                key={`passed-${i}`}
-                component="input"
-                readOnly
-                disabled
-                value={codeChars[i]}
-                sx={{
-                  ...verificationSlotInputSx(false, false),
-                  bgcolor: '#f5f5f5',
-                  cursor: 'default'
-                }}
-                aria-label={`Verification code digit ${i + 1} of 6`}
-              />
-            ))}
-          </Box>
+          <SmsVerificationDigitRow
+            codeChars={codeChars}
+            enabled={false}
+            locked
+            onSlotChange={() => {}}
+            onSlotKeyDown={() => {}}
+          />
 
           <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
             <Box sx={smsVerificationPassedStripSx}>

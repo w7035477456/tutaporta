@@ -41,6 +41,7 @@ import {
   useBillScheduleDescColumnWidth
 } from './BillScheduleDescColumnResize';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
+import SmsReminderButton from './SmsReminderButton';
 import {
   BILL_SCHEDULE_INK,
   BILL_SCHEDULE_SURFACE,
@@ -89,11 +90,20 @@ function blankRow(rowIndex) {
     bill_type: 'Manual',
     action: null,
     paid_record_id: null,
+    sms_reminder_id: null,
     bill_icon: null,
     has_bill_content: false,
     status: '',
     status_tone: 'none'
   };
+}
+
+/** Due date of a row in the viewed month as 'YYYY-MM-DD' (SMS reminder popup), or null. */
+function rowDueYmd(row, year, month) {
+  const day = Number(row.due_day);
+  if (!(day >= 1 && day <= 31) || !year || !month) return null;
+  const d = Math.min(day, new Date(year, month, 0).getDate());
+  return `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 function normalizeAmountLocal(raw) {
@@ -388,6 +398,15 @@ export default function BillScheduleMonthlyPanel({
     }
   };
 
+  /** SMS popup already linked the saved row on the server: update the page without marking it unsaved. */
+  const setRowSmsReminder = (billId, smsReminderId) => {
+    const next = rowsRef.current.map((r) =>
+      Number(r.monthly_bill_id) === Number(billId) ? { ...r, sms_reminder_id: smsReminderId } : r
+    );
+    rowsRef.current = next;
+    setRows(next);
+  };
+
   const updateRow = (index, patch) => {
     const next = rowsRef.current.map((r, i) => {
       if (i !== index) return r;
@@ -425,6 +444,7 @@ export default function BillScheduleMonthlyPanel({
               : 'Manual',
           action: r.bill_type === 'Auto' || isPaidOffType(r.bill_type) ? null : r.action,
           paid_record_id: r.paid_record_id,
+          sms_reminder_id: r.sms_reminder_id || null,
           bill_icon: r.bill_icon || null,
           email_scan_pending: r.email_scan_pending === true
         }));
@@ -917,13 +937,24 @@ export default function BillScheduleMonthlyPanel({
                   </Box>
                 </td>
                 <td>
-                  <BillDueDayInput
-                    value={row.due_day ?? ''}
-                    year={year}
-                    month={month}
-                    onChange={(day) => updateRow(index, { due_day: day })}
-                    sx={inputSx}
-                  />
+                  <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                    <BillDueDayInput
+                      value={row.due_day ?? ''}
+                      year={year}
+                      month={month}
+                      onChange={(day) => updateRow(index, { due_day: day })}
+                      sx={inputSx}
+                    />
+                    <SmsReminderButton
+                      kind="monthly"
+                      reminderId={row.sms_reminder_id || null}
+                      billId={row.monthly_bill_id || null}
+                      label={row.bill_description || ''}
+                      dueYmd={rowDueYmd(row, year, month)}
+                      disabled={loading || saving}
+                      onChange={(id) => setRowSmsReminder(row.monthly_bill_id, id)}
+                    />
+                  </Box>
                 </td>
                 <td>
                   <TextField

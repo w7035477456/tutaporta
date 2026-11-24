@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -8,6 +8,8 @@ import Checkbox from '@mui/material/Checkbox';
 import Radio from '@mui/material/Radio';
 import Slider from '@mui/material/Slider';
 import Typography from '@mui/material/Typography';
+import InputAdornment from '@mui/material/InputAdornment';
+import PasswordVisibilityToggle from 'ui-component/PasswordVisibilityToggle';
 import AuthCardWrapper from 'views/pages/authentication/AuthCardWrapper';
 import GreenButton from 'ui-component/GreenButton';
 import useColorTemplate7PopupLargeDarkLayout from 'hooks/useColorTemplate7PopupLargeDarkLayout';
@@ -130,8 +132,31 @@ function ColorTemplate7PopupLargeDarkInput({
   formRow = false,
   inputHeight = 'bsize',
   inputProps,
+  type,
+  slotProps,
+  disabled,
   ...props
 }) {
+  const isPassword = type === 'password';
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const resolvedType = isPassword && passwordVisible ? 'text' : type;
+  const resolvedSlotProps = isPassword
+    ? {
+        ...(slotProps || {}),
+        input: {
+          ...(slotProps?.input || {}),
+          endAdornment: (
+            <InputAdornment position="end">
+              <PasswordVisibilityToggle
+                visible={passwordVisible}
+                onToggle={() => setPasswordVisible((v) => !v)}
+                disabled={disabled}
+              />
+            </InputAdornment>
+          )
+        }
+      }
+    : slotProps;
   const baseSx = formRow
     ? fullWidth
       ? colorTemplate7PopupFormRowInputStretchSx({}, inputHeight)
@@ -156,6 +181,9 @@ function ColorTemplate7PopupLargeDarkInput({
         maxLength: COLOR_TEMPLATE7_POPUP_INPUT_MAX_CHARS,
         ...inputProps
       }}
+      type={resolvedType}
+      slotProps={resolvedSlotProps}
+      disabled={disabled}
       {...props}
     />
   );
@@ -669,7 +697,11 @@ ColorTemplate7PopupLargeDarkInput.propTypes = {
   formRow: PropTypes.bool,
   /** 'bsize' (default) — fe/.env BSIZE vw height; 'fixed' — legacy 40px. */
   inputHeight: PropTypes.oneOf(['bsize', 'fixed']),
-  inputProps: PropTypes.object
+  inputProps: PropTypes.object,
+  /** type="password" adds an eye toggle (closed = hidden, open = visible). */
+  type: PropTypes.string,
+  slotProps: PropTypes.object,
+  disabled: PropTypes.bool
 };
 
 ColorTemplate7PopupLargeDarkActionButton.propTypes = {

@@ -39,6 +39,7 @@ import {
   useBillScheduleDescColumnWidth
 } from './BillScheduleDescColumnResize';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
+import SmsReminderButton from './SmsReminderButton';
 import {
   BILL_SCHEDULE_INK,
   BILL_SCHEDULE_SURFACE,
@@ -101,11 +102,31 @@ function blankRow(rowIndex) {
     bill_source: null,
     action: null,
     paid_record_id: null,
+    sms_reminder_id: null,
     bill_icon: null,
     has_bill_content: false,
     status: '',
     status_tone: 'none'
   };
+}
+
+function ymdKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Next due date of a row in the viewed year as 'YYYY-MM-DD' (SMS reminder popup), or null. */
+function rowDueYmd(row, year, today = new Date()) {
+  const day = Number(row.due_month_day);
+  if (!(day >= 1 && day <= 31)) return null;
+  const on = (y, m) => new Date(y, m - 1, Math.min(day, new Date(y, m, 0).getDate()));
+  if (isMonthlyPeriod(row.bill_period)) {
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const dates = Array.from({ length: 12 }, (_, i) => on(year, i + 1));
+    return ymdKey(dates.find((d) => d >= start) || dates[11]);
+  }
+  const month = Number(row.bill_month);
+  if (!(month >= 1 && month <= 12)) return null;
+  return ymdKey(on(is2YearPeriod(row.bill_period) ? Number(row.due_year) || year : year, month));
 }
 
 function normalizeAmountLocal(raw) {
@@ -505,6 +526,15 @@ export default function BillScheduleYearlyPanel({
     }
   };
 
+  /** SMS popup already linked the saved row on the server: update the page without marking it unsaved. */
+  const setRowSmsReminder = (billId, smsReminderId) => {
+    const next = rowsRef.current.map((r) =>
+      Number(r.yearly_bill_id) === Number(billId) ? { ...r, sms_reminder_id: smsReminderId } : r
+    );
+    rowsRef.current = next;
+    setRows(next);
+  };
+
   const updateRow = (index, patch) => {
     const next = rowsRef.current.map((r, i) => {
       if (i !== index) return r;
@@ -557,6 +587,7 @@ export default function BillScheduleYearlyPanel({
             bill_source: BILL_SOURCE_OPTIONS.includes(r.bill_source) ? r.bill_source : null,
             action: r.bill_type === 'Auto' ? null : r.action,
             paid_record_id: r.paid_record_id,
+            sms_reminder_id: r.sms_reminder_id || null,
             bill_icon: r.bill_icon || null,
             email_scan_pending: r.email_scan_pending === true
           };
@@ -1102,6 +1133,15 @@ export default function BillScheduleYearlyPanel({
                       }}
                       placeholder="Day"
                       sx={{ ...inputSx, width: 72 }}
+                    />
+                    <SmsReminderButton
+                      kind="yearly"
+                      reminderId={row.sms_reminder_id || null}
+                      billId={row.yearly_bill_id || null}
+                      label={row.bill_description || ''}
+                      dueYmd={rowDueYmd(row, year)}
+                      disabled={loading || saving}
+                      onChange={(id) => setRowSmsReminder(row.yearly_bill_id, id)}
                     />
                   </Box>
                 </td>

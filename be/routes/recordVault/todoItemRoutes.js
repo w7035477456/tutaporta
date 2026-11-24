@@ -62,7 +62,7 @@ function requireSinglesId(req) {
 
 async function listItems(client, singlesId, storageBackend) {
   const { rows } = await client.query(
-    `SELECT t.todo_item_id, t.kind, t.lane, t.seq, t.body, t.paid_record_id,
+    `SELECT t.todo_item_id, t.kind, t.lane, t.seq, t.body, t.paid_record_id, t.sms_reminder_id,
             to_char(t.due_date, 'YYYY-MM-DD') AS due_date,
             t.done_at,
             t.lane_entered_at,
@@ -89,6 +89,7 @@ async function listItems(client, singlesId, storageBackend) {
     body: r.body ?? '',
     paid_record_id: r.paid_record_id != null ? Number(r.paid_record_id) : null,
     due_date: r.due_date || null,
+    sms_reminder_id: r.sms_reminder_id != null ? Number(r.sms_reminder_id) : null,
     done_at: r.done_at ? new Date(r.done_at).toISOString() : null,
     lane_entered_at: r.lane_entered_at ? new Date(r.lane_entered_at).toISOString() : null,
     has_bill_content: Boolean(r.has_bill_content)
@@ -146,6 +147,7 @@ export async function putTodoItems(req, res) {
         body: String(item?.body ?? '').slice(0, MAX_BODY),
         paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null,
         due_date: normalizeDueDate(item?.due_date),
+        sms_reminder_id: toInt(item?.sms_reminder_id) > 0 ? toInt(item?.sms_reminder_id) : null,
         // Only tasks in Todo Done carry a completion time.
         done_at: lane === 'done' ? normalizeTimestamp(item?.done_at) : null,
         // Missing / invalid → now (task just landed in this lane).
@@ -178,9 +180,22 @@ export async function putTodoItems(req, res) {
       for (const r of normalized) {
         await client.query(
           `INSERT INTO outdateddbsnapshotoct2024.todo_item (
-             singles_id, storage_backend, lane, seq, body, paid_record_id, due_date, done_at, lane_entered_at, kind
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8::timestamptz, COALESCE($9::timestamptz, now()), $10)`,
-          [singlesId, storageBackend, r.lane, r.seq, r.body, r.paid_record_id, r.due_date, r.done_at, r.lane_entered_at, r.kind]
+             singles_id, storage_backend, lane, seq, body, paid_record_id, due_date, done_at, lane_entered_at, kind,
+             sms_reminder_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7::date, $8::timestamptz, COALESCE($9::timestamptz, now()), $10, $11)`,
+          [
+            singlesId,
+            storageBackend,
+            r.lane,
+            r.seq,
+            r.body,
+            r.paid_record_id,
+            r.due_date,
+            r.done_at,
+            r.lane_entered_at,
+            r.kind,
+            r.sms_reminder_id || null
+          ]
         );
       }
       const items = await listItems(client, singlesId, storageBackend);

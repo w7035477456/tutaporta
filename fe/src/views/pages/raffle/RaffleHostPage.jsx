@@ -5,6 +5,7 @@ import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Typography from '@mui/material/Typography';
 import ColorTemplate13DisableGreenButton from 'ui-component/ColorTemplate13DisableGreenButton';
+import PasswordVisibilityToggle from 'ui-component/PasswordVisibilityToggle';
 import tutaMallParkinglot from 'assets/images/tutaMallParkinglot.png';
 import { drawRaffleHostWinner, fetchRaffleHostEvents, loginRaffleHost, verifyRaffleHostTicket } from 'api/raffleHostFe';
 
@@ -148,6 +149,7 @@ export default function RaffleHostPage() {
   const [eventsError, setEventsError] = useState('');
   const [eventId, setEventId] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [host, setHost] = useState(null);
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
@@ -365,14 +367,22 @@ export default function RaffleHostPage() {
           </FieldRow>
           {!host ? (
             <FieldRow label="Host password">
-              <Box
-                component="input"
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                sx={fieldSx}
-              />
+              <Box sx={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex' }}>
+                <Box
+                  component="input"
+                  type={passwordVisible ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  sx={{ ...fieldSx, pr: 5 }}
+                />
+                <PasswordVisibilityToggle
+                  visible={passwordVisible}
+                  onToggle={() => setPasswordVisible((v) => !v)}
+                  edge={false}
+                  sx={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)' }}
+                />
+              </Box>
             </FieldRow>
           ) : null}
           {eventsError ? (

@@ -10,6 +10,7 @@ import BillReceiptsPopup from './BillReceiptsPopup';
 import BillScheduleTutorialHeaderBar from './BillScheduleTutorialHeaderBar';
 import TodoDoneBadge from './TodoDoneBadge';
 import TodoDueDateButton, { localDateKey } from './TodoDueDateButton';
+import SmsReminderButton from './SmsReminderButton';
 import { attachDropToBillRow, readBillRowDrop } from './billRowDropAttach';
 import { BILL_SCHEDULE_INK, billSchedulePanelRootSx } from './billScheduleTheme';
 
@@ -84,6 +85,7 @@ function fromServer(items) {
     body: it.body ?? '',
     paidRecordId: Number(it.paid_record_id) || null,
     dueDate: it.due_date || null,
+    smsReminderId: Number(it.sms_reminder_id) || null,
     doneAt: it.done_at || null,
     laneEnteredAt: it.lane_entered_at || null,
     hasContent: Boolean(it.has_bill_content)
@@ -196,6 +198,7 @@ export default function BillScheduleTodoPanel({
       body: it.body,
       paid_record_id: it.paidRecordId || null,
       due_date: it.dueDate || null,
+      sms_reminder_id: it.smsReminderId || null,
       done_at: it.doneAt || null,
       lane_entered_at: it.laneEnteredAt || null
     }));
@@ -293,6 +296,8 @@ export default function BillScheduleTodoPanel({
   const updateBody = (id, body) => commit((prev) => prev.map((it) => (it.id === id ? { ...it, body } : it)));
   const setDoneAt = (id, doneAt) => commit((prev) => prev.map((it) => (it.id === id ? { ...it, doneAt } : it)));
   const setDueDate = (id, dueDate) => commit((prev) => prev.map((it) => (it.id === id ? { ...it, dueDate } : it)));
+  const setSmsReminder = (id, smsReminderId) =>
+    commit((prev) => prev.map((it) => (it.id === id ? { ...it, smsReminderId } : it)));
   const removeItem = (id) => commit((prev) => prev.filter((it) => it.id !== id));
 
   /** Popup / drop reported the task's Bills/Receipts record — link it (saves when the link is new). */
@@ -831,7 +836,15 @@ export default function BillScheduleTodoPanel({
                           <Box sx={{ flexShrink: 0, alignSelf: 'center', display: 'flex', alignItems: 'center', gap: 0.75 }}>
                             {lane.key === 'done' ? (
                               <TodoDoneBadge value={item.doneAt} onChange={(next) => setDoneAt(item.id, next)} />
-                            ) : null}
+                            ) : (
+                              <SmsReminderButton
+                                kind="todo"
+                                reminderId={item.smsReminderId}
+                                label={item.body || ''}
+                                dueYmd={item.dueDate}
+                                onChange={(next) => setSmsReminder(item.id, next)}
+                              />
+                            )}
                             {(() => {
                               const days = daysInLane(item.laneEnteredAt, todayKey);
                               const label = `${days} day${days === 1 ? '' : 's'} in ${lane.title}`;

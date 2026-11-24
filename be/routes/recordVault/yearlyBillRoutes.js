@@ -222,6 +222,7 @@ function mapRow(row, year) {
     bill_source: normalizeBillSource(row.bill_source),
     action: row.action ?? null,
     paid_record_id: row.paid_record_id != null ? Number(row.paid_record_id) : null,
+    sms_reminder_id: row.sms_reminder_id != null ? Number(row.sms_reminder_id) : null,
     bill_icon: row.bill_icon || null,
     has_bill_content: Boolean(row.has_bill_content),
     email_scan_pending: Boolean(row.email_scan_pending),
@@ -306,12 +307,12 @@ export async function ensureYearCloned(
     `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
        singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
        bill_description, due_month_day, due_year, amount, bill_type, bill_period, bill_source,
-       action, paid_record_id, bill_icon
+       action, paid_record_id, bill_icon, sms_reminder_id
      )
      SELECT
        singles_id, storage_backend, tab_label, false, $4, bill_month, row_index,
        bill_description, due_month_day, due_year, amount, bill_type, bill_period, bill_source,
-       NULL, NULL, bill_icon
+       NULL, NULL, bill_icon, sms_reminder_id
        FROM outdateddbsnapshotoct2024.yearly_bill
       WHERE singles_id = $1 AND storage_backend = $2
         AND tab_label = $3 AND soft_delete = false AND bill_year = $5
@@ -443,6 +444,7 @@ export async function putYearlyBill(req, res) {
         bill_source: normalizeBillSource(row?.bill_source),
         action,
         paid_record_id: paidRecordId && paidRecordId > 0 ? paidRecordId : null,
+        sms_reminder_id: toInt(row?.sms_reminder_id) > 0 ? toInt(row?.sms_reminder_id) : null,
         bill_icon: normalizeBillIcon(row?.bill_icon),
         email_scan_pending: row?.email_scan_pending === true
       };
@@ -458,19 +460,26 @@ export async function putYearlyBill(req, res) {
     try {
       await client.query('BEGIN');
       const { rows: priorLinks } = await client.query(
-        `SELECT yearly_bill_id, paid_record_id
+        `SELECT yearly_bill_id, paid_record_id, sms_reminder_id
            FROM outdateddbsnapshotoct2024.yearly_bill
           WHERE singles_id = $1 AND storage_backend = $2
             AND tab_label = $3 AND soft_delete = false AND bill_year = $4
-            AND paid_record_id IS NOT NULL`,
+            AND (paid_record_id IS NOT NULL OR sms_reminder_id IS NOT NULL)`,
         [singlesId, storageBackend, tabLabel, year]
       );
       const priorPaidByBillId = new Map(
-        priorLinks.map((p) => [Number(p.yearly_bill_id), Number(p.paid_record_id)])
+        priorLinks.map((p) => [Number(p.yearly_bill_id), Number(p.paid_record_id) || null])
+      );
+      // SMS popup links the saved row directly; keep it if this save came from an older page state.
+      const priorSmsByBillId = new Map(
+        priorLinks.map((p) => [Number(p.yearly_bill_id), Number(p.sms_reminder_id) || null])
       );
       for (const r of normalized) {
         if (!r.paid_record_id && r.prior_bill_id) {
           r.paid_record_id = priorPaidByBillId.get(r.prior_bill_id) || null;
+        }
+        if (!r.sms_reminder_id && r.prior_bill_id) {
+          r.sms_reminder_id = priorSmsByBillId.get(r.prior_bill_id) || null;
         }
       }
       await client.query(
@@ -484,8 +493,8 @@ export async function putYearlyBill(req, res) {
           `INSERT INTO outdateddbsnapshotoct2024.yearly_bill (
              singles_id, storage_backend, tab_label, soft_delete, bill_year, bill_month, row_index,
              bill_description, due_month_day, due_year, amount, bill_type, bill_period, bill_source,
-             action, paid_record_id, bill_icon, email_scan_pending
-           ) VALUES ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+             action, paid_record_id, bill_icon, email_scan_pending, sms_reminder_id
+           ) VALUES ($1,$2,$3,false,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
            RETURNING yearly_bill_id`,
           [
             singlesId,
@@ -504,7 +513,8 @@ export async function putYearlyBill(req, res) {
             r.action,
             r.paid_record_id,
             r.bill_icon,
-            r.email_scan_pending
+            r.email_scan_pending,
+            r.sms_reminder_id
           ]
         );
         const newBillId = Number(inserted[0]?.yearly_bill_id);

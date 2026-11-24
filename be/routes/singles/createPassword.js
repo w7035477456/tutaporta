@@ -104,7 +104,7 @@ export async function createPassword(req, res) {
       return res.status(400).json({ error: 'Phone number must be 10 digits' });
     }
     const signupCategory = resolveSignupMemberCategory(emailNorm);
-    if (isDuplicatePhoneAllowed(signupCategory)) {
+    if (isDuplicatePhoneAllowed(signupCategory, formattedPhone)) {
       console.log(LOG_PREFIX, 'duplicate phone allowed for', signupCategory);
     } else if (await respondIfDuplicatePhone(res, formattedPhone, signupCategory)) {
       console.log(LOG_PREFIX, 'reject: phone already in use');

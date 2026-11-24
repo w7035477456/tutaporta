@@ -105,7 +105,7 @@ export async function registerUser(req, res) {
     const formattedPhoneForCheck = formatPhoneForDuplicateCheck(phoneRaw);
     if (formattedPhoneForCheck) {
       const signupCategory = resolveSignupMemberCategory(emailTrimmed);
-      if (isDuplicatePhoneAllowed(signupCategory)) {
+      if (isDuplicatePhoneAllowed(signupCategory, formattedPhoneForCheck)) {
         console.log('[register] duplicate phone allowed for', signupCategory);
       } else {
         const duplicatePhoneError = await findDuplicatePhoneRegistrationError(formattedPhoneForCheck, signupCategory);

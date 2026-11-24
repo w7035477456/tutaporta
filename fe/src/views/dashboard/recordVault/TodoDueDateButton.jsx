@@ -5,6 +5,10 @@ import Popover from '@mui/material/Popover';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { keyframes } from '@mui/material/styles';
+import dayjs from 'dayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { DateCalendar } from '@mui/x-date-pickers/DateCalendar';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 
 /** Past due: alternate full colour ↔ grey (hard switch, no fade). */
@@ -73,7 +77,7 @@ const popBtnSx = {
 };
 
 /**
- * ToDo task Due Date button. Click → popup to pick a date (calendar) or type mm/dd/yyyy.
+ * ToDo task Due Date button. Click → popup with an always-open calendar, or type mm/dd/yyyy.
  * `blink` = past due and not done: icon alternates colour ↔ grey.
  */
 export default function TodoDueDateButton({ value = null, onChange, blink = false, disabled = false }) {
@@ -152,13 +156,52 @@ export default function TodoDueDateButton({ value = null, onChange, blink = fals
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             inputProps={{ min: '2000-01-01', max: '2100-12-31', 'aria-label': 'Due date (mm/dd/yyyy)' }}
-            helperText="Pick from the calendar or type mm/dd/yyyy"
             sx={{
               '& .MuiInputBase-root': { bgcolor: '#fff', fontSize: '1.05rem', fontWeight: 700 },
               '& input': { color: '#000', WebkitTextFillColor: '#000' },
-              '& .MuiFormHelperText-root': { mx: 0, color: '#555' }
+              // The calendar is always shown below, so hide the native picker icon.
+              '& input::-webkit-calendar-picker-indicator': { display: 'none' }
             }}
           />
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DateCalendar
+              value={isValidDateKey(draft) ? dayjs(draft) : null}
+              referenceDate={dayjs()}
+              onChange={(d) => d && d.isValid() && setDraft(d.format('YYYY-MM-DD'))}
+              minDate={dayjs('2000-01-01')}
+              maxDate={dayjs('2100-12-31')}
+              sx={{
+                width: 280,
+                height: 'auto',
+                maxHeight: 340,
+                m: 0,
+                border: '1px solid #ccc',
+                borderRadius: 1,
+                '& .MuiPickersCalendarHeader-label': { fontWeight: 800, color: '#000' },
+                '& .MuiDayCalendar-weekDayLabel': { fontWeight: 800, color: '#000' },
+                '& .MuiPickersDay-root': { fontWeight: 600, color: '#000' },
+                '& .MuiPickersDay-root.Mui-selected': { bgcolor: '#1976d2', color: '#fff', fontWeight: 900 },
+                '& .MuiPickersDay-today:not(.Mui-selected)': { border: '2px solid #e60000' }
+              }}
+            />
+          </LocalizationProvider>
+          <Box
+            component="button"
+            type="button"
+            onClick={() => setDraft(localDateKey())}
+            sx={{
+              alignSelf: 'flex-end',
+              border: 'none',
+              bgcolor: 'transparent',
+              color: '#1976d2',
+              fontWeight: 800,
+              cursor: 'pointer',
+              p: 0,
+              mt: -0.5
+            }}
+          >
+            Today
+          </Box>
           <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
             <Box component="button" type="button" onClick={clear} disabled={!set} sx={{ ...popBtnSx, bgcolor: '#bdbdbd', mr: 'auto' }}>
               Clear

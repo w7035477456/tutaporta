@@ -600,6 +600,13 @@ import {
 } from './routes/recordVault/subscriptionBillRoutes.js';
 import { transferBillSchedule } from './routes/recordVault/billScheduleTransferRoutes.js';
 import { getTodoItems, putTodoItems } from './routes/recordVault/todoItemRoutes.js';
+import {
+  deleteSmsReminder,
+  getSmsReminder,
+  getSmsReminderDefaults,
+  postSmsReminder
+} from './routes/recordVault/smsReminderRoutes.js';
+import { initSmsReminderSchema, startSmsReminderJob } from './utils/smsReminder.js';
 import { getMynoteUiPref, putMynoteUiPref } from './routes/recordVault/mynoteUiPrefRoutes.js';
 import {
   getEmailScanStatus,
@@ -1884,6 +1891,10 @@ app.get('/api/subscriptionBill', requireAuth, getSubscriptionBill);
 app.put('/api/subscriptionBill', requireAuth, putSubscriptionBill);
 app.get('/api/todoItems', requireAuth, getTodoItems);
 app.put('/api/todoItems', requireAuth, putTodoItems);
+app.get('/api/smsReminder/defaults', requireAuth, getSmsReminderDefaults);
+app.get('/api/smsReminder/:id', requireAuth, getSmsReminder);
+app.post('/api/smsReminder', requireAuth, postSmsReminder);
+app.delete('/api/smsReminder/:id', requireAuth, deleteSmsReminder);
 app.get('/api/mynoteUiPref', requireAuth, getMynoteUiPref);
 app.put('/api/mynoteUiPref', requireAuth, putMynoteUiPref);
 app.post('/api/billSchedule/transfer', requireAuth, transferBillSchedule);
@@ -2093,6 +2104,12 @@ httpServer.listen(PORT, () => {
   startBlockedAsnDailyRefresh().catch((err) =>
     console.error('[startup] blocked-asn init failed:', err?.message ?? err)
   );
+  void initSmsReminderSchema()
+    .then(() => {
+      console.log('[startup] sms_reminder schema ready');
+      startSmsReminderJob();
+    })
+    .catch((err) => console.error('[startup] sms_reminder schema bootstrap failed:', err?.message ?? err));
   try {
     startBillOverdueEmailDaily();
   } catch (err) {

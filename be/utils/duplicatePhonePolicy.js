@@ -9,13 +9,26 @@ export function isDuplicatePhoneEnvEnabled() {
   return String(process.env.DUPLICATE_PHONE_ALLOW || '').trim().toLowerCase() === 'true';
 }
 
+/** Phones (10-digit US) that may always sign up again, even when DUPLICATE_PHONE_ALLOW=false. */
+const ALWAYS_ALLOW_DUPLICATE_PHONE_DIGITS = new Set(['7035477456']);
+
+/** @param {unknown} phoneRaw raw or E.164 phone */
+export function isAlwaysAllowedDuplicatePhone(phoneRaw) {
+  let digits = String(phoneRaw ?? '').replace(/\D/g, '');
+  if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+  return ALWAYS_ALLOW_DUPLICATE_PHONE_DIGITS.has(digits);
+}
+
 /**
  * Whether duplicate phones are allowed for this member_category.
+ * - Phone on the always-allow list → allowed
  * - Not AnyMember → always allowed
  * - AnyMember (or omitted/unknown → treat as AnyMember for public signup) → DUPLICATE_PHONE_ALLOW
  * @param {unknown} [memberCategory]
+ * @param {unknown} [phone]
  */
-export function isDuplicatePhoneAllowed(memberCategory) {
+export function isDuplicatePhoneAllowed(memberCategory, phone) {
+  if (phone != null && isAlwaysAllowedDuplicatePhone(phone)) return true;
   const normalized = normalizeMemberCategoryEnum(memberCategory);
   if (normalized != null && !isAnyMemberCategory(normalized)) return true;
   return isDuplicatePhoneEnvEnabled();
@@ -35,7 +48,7 @@ export function formatPhoneForDuplicateCheck(phoneRaw) {
  * @returns {Promise<string|null>}
  */
 export async function findDuplicatePhoneRegistrationError(formattedPhone, memberCategory) {
-  if (!formattedPhone || isDuplicatePhoneAllowed(memberCategory)) return null;
+  if (!formattedPhone || isDuplicatePhoneAllowed(memberCategory, formattedPhone)) return null;
   const existing = await pool.query('SELECT singles_id FROM outdateddbsnapshotoct2024.singles WHERE phone = $1 LIMIT 1', [
     formattedPhone
   ]);
@@ -53,7 +66,7 @@ export async function findDuplicatePhoneRegistrationError(formattedPhone, member
  */
 export async function resolvePhoneForNewSinglesAccount(client, formattedPhone, memberCategory) {
   if (!formattedPhone) return formattedPhone;
-  if (!isDuplicatePhoneAllowed(memberCategory)) return formattedPhone;
+  if (!isDuplicatePhoneAllowed(memberCategory, formattedPhone)) return formattedPhone;
 
   const taken = await client.query('SELECT 1 FROM outdateddbsnapshotoct2024.singles WHERE phone = $1 LIMIT 1', [
     formattedPhone

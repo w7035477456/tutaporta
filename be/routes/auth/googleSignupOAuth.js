@@ -581,7 +581,7 @@ export async function googleSignupComplete(req, res) {
     }
 
     const signupCategory = resolveSignupMemberCategory(emailNorm);
-    if (!isDuplicatePhoneAllowed(signupCategory)) {
+    if (!isDuplicatePhoneAllowed(signupCategory, formattedPhone)) {
       if (await respondIfDuplicatePhone(res, formattedPhone, signupCategory)) return;
     }
 
