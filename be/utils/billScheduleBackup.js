@@ -80,11 +80,16 @@ export async function exportBillScheduleForBackup(singlesId, notesMount) {
   );
   const { rows: subscription } = await pool.query(
     `SELECT bill_year, bill_month, row_index, bill_description, due_day, amount,
-            bill_type, action, paid_record_id, bill_icon
+            bill_type, action, paid_record_id, bill_icon, locked
        FROM outdateddbsnapshotoct2024.subscription_bill
       WHERE singles_id = $1 AND storage_backend = $2
-      ORDER BY bill_year, bill_month, row_index`,
+      ORDER BY bill_year, bill_month, locked, row_index`,
     [singlesId, CLOUD_BACKEND]
+  );
+  // Locked Subscription password (Argon2id hash only) so restored locked rows stay locked.
+  const { rows: lockRows } = await pool.query(
+    `SELECT password_hash FROM outdateddbsnapshotoct2024.subscription_lock WHERE singles_id = $1`,
+    [singlesId]
   );
 
   // ToDo board (3 swim lanes): tasks + dividers in lane/seq order.
@@ -160,6 +165,7 @@ export async function exportBillScheduleForBackup(singlesId, notesMount) {
     monthly,
     yearly,
     subscription,
+    subscription_lock: lockRows[0] ? { password_hash: lockRows[0].password_hash } : null,
     todo,
     paid_records: paidRecords
   };
@@ -274,6 +280,17 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       `DELETE FROM outdateddbsnapshotoct2024.subscription_bill WHERE singles_id = $1 AND storage_backend = $2`,
       [singlesId, CLOUD_BACKEND]
     );
+    const lockHash = String(payload?.subscription_lock?.password_hash ?? '').trim();
+    if (lockHash) {
+      await client.query(
+        `INSERT INTO outdateddbsnapshotoct2024.subscription_lock (singles_id, password_hash)
+         VALUES ($1, $2)
+         ON CONFLICT (singles_id) DO UPDATE
+           SET password_hash = EXCLUDED.password_hash, failed_attempts = 0, locked_until = NULL,
+               updated_at = now()`,
+        [singlesId, lockHash]
+      );
+    }
     if (hasTodo) {
       await client.query(
         `DELETE FROM outdateddbsnapshotoct2024.todo_item WHERE singles_id = $1 AND storage_backend = $2`,
@@ -461,8 +478,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
       const { rows: inserted } = await client.query(
         `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
            singles_id, storage_backend, bill_year, bill_month, row_index,
-           bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+           bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, locked
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
          RETURNING subscription_bill_id`,
         [
           singlesId,
@@ -476,7 +493,8 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
           billType,
           normalizeAction(billType, r?.action),
           oldPaidId ? newIdByOldId.get(oldPaidId) ?? null : null,
-          normalizeBillIcon(r?.bill_icon)
+          normalizeBillIcon(r?.bill_icon),
+          r?.locked === true
         ]
       );
       if (oldPaidId) await linkPaidRecord(oldPaidId, 'subscription', Number(inserted[0].subscription_bill_id));

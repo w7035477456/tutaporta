@@ -1,6 +1,7 @@
 import pool from '../../db/connection.js';
 import { readBillStorageBackend } from '../../utils/billScheduleStorageBackend.js';
 import { normalizeBillIcon } from '../../utils/billIconName.js';
+import { requireSubscriptionUnlock } from '../../utils/subscriptionLockToken.js';
 
 function toInt(value) {
   const n = Number(value);
@@ -24,6 +25,12 @@ function sendError(res, error, fallback = 'Subscription bill request failed') {
     message =
       'Database schema for subscription_bill is outdated. On Postgres run: be/db/alterPaidRecordSubscription.sql';
   }
+  if (error?.code === 'SUBSCRIPTION_LOCKED') {
+    return res.status(403).json({ error: message, code: 'SUBSCRIPTION_LOCKED' });
+  }
+  if (pgCode === '42703' && /locked/.test(String(error?.message))) {
+    message = 'Database schema for subscription_bill is outdated. Run dbmigrate (scripts/db-migrate.sh).';
+  }
   if (statusCode >= 500) {
     console.error('[subscription-bill]', {
       message: error?.message,
@@ -42,6 +49,12 @@ function requireSinglesId(req) {
   const singlesId = toInt(req.auth?.singles_id);
   if (!singlesId || singlesId < 1) throw httpError(401, 'Authentication required');
   return singlesId;
+}
+
+/** locked=1|true → the password-protected Locked Subscription table. */
+export function readLockedFlag(queryOrBody) {
+  const v = queryOrBody?.locked;
+  return v === true || v === 1 || /^(1|true)$/i.test(String(v ?? ''));
 }
 
 function parseYearMonth(queryOrBody) {
@@ -143,34 +156,36 @@ function mapRow(row, year, month) {
     bill_icon: row.bill_icon || null,
     has_bill_content: Boolean(row.has_bill_content),
     email_scan_pending: Boolean(row.email_scan_pending),
+    locked: Boolean(row.locked),
     created_at: row.created_at,
     updated_at: row.updated_at,
     ...derived
   };
 }
 
-async function countMonthRows(client, singlesId, year, month, storageBackend) {
+async function countMonthRows(client, singlesId, year, month, storageBackend, locked) {
   const { rows } = await client.query(
     `SELECT COUNT(*)::int AS c
        FROM outdateddbsnapshotoct2024.subscription_bill
       WHERE singles_id = $1 AND storage_backend = $2
-        AND bill_year = $3 AND bill_month = $4`,
-    [singlesId, storageBackend, year, month]
+        AND bill_year = $3 AND bill_month = $4 AND locked = $5`,
+    [singlesId, storageBackend, year, month, locked]
   );
   return Number(rows[0]?.c) || 0;
 }
 
-async function findPriorMonthWithRows(client, singlesId, year, month, storageBackend) {
+async function findPriorMonthWithRows(client, singlesId, year, month, storageBackend, locked) {
   const { rows } = await client.query(
     `SELECT bill_year, bill_month
        FROM outdateddbsnapshotoct2024.subscription_bill
       WHERE singles_id = $1
         AND storage_backend = $2
+        AND locked = $5
         AND (bill_year < $3 OR (bill_year = $3 AND bill_month < $4))
       GROUP BY bill_year, bill_month
       ORDER BY bill_year DESC, bill_month DESC
       LIMIT 1`,
-    [singlesId, storageBackend, year, month]
+    [singlesId, storageBackend, year, month, locked]
   );
   if (!rows[0]) return null;
   return { year: Number(rows[0].bill_year), month: Number(rows[0].bill_month) };
@@ -180,34 +195,35 @@ async function findPriorMonthWithRows(client, singlesId, year, month, storageBac
  * If target month has no rows, clone template fields from latest prior month
  * (action + paid_record_id left NULL). Unapproved Auto Scan rows are not cloned.
  */
-export async function ensureMonthCloned(client, singlesId, year, month, storageBackend) {
-  const existing = await countMonthRows(client, singlesId, year, month, storageBackend);
+export async function ensureMonthCloned(client, singlesId, year, month, storageBackend, locked = false) {
+  const existing = await countMonthRows(client, singlesId, year, month, storageBackend, locked);
   if (existing > 0) return { cloned: false, from: null };
 
-  const prior = await findPriorMonthWithRows(client, singlesId, year, month, storageBackend);
+  const prior = await findPriorMonthWithRows(client, singlesId, year, month, storageBackend, locked);
   if (!prior) return { cloned: false, from: null };
 
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
        bill_description, due_day, amount, bill_type,
-       action, paid_record_id, bill_icon
+       action, paid_record_id, bill_icon, locked
      )
      SELECT
        singles_id, storage_backend, $3, $4, row_index,
        bill_description, due_day, amount, bill_type,
-       NULL, NULL, bill_icon
+       NULL, NULL, bill_icon, locked
        FROM outdateddbsnapshotoct2024.subscription_bill
       WHERE singles_id = $1 AND storage_backend = $2
         AND bill_year = $5 AND bill_month = $6
+        AND locked = $7
         AND email_scan_pending = false
       ORDER BY row_index ASC`,
-    [singlesId, storageBackend, year, month, prior.year, prior.month]
+    [singlesId, storageBackend, year, month, prior.year, prior.month, locked]
   );
   return { cloned: true, from: prior };
 }
 
-async function listMonthRows(client, singlesId, year, month, storageBackend) {
+async function listMonthRows(client, singlesId, year, month, storageBackend, locked) {
   const { rows } = await client.query(
     `SELECT mb.*,
             (
@@ -222,9 +238,9 @@ async function listMonthRows(client, singlesId, year, month, storageBackend) {
        LEFT JOIN outdateddbsnapshotoct2024.paid_record pr
          ON pr.paid_record_id = mb.paid_record_id
       WHERE mb.singles_id = $1 AND mb.storage_backend = $2
-        AND mb.bill_year = $3 AND mb.bill_month = $4
+        AND mb.bill_year = $3 AND mb.bill_month = $4 AND mb.locked = $5
       ORDER BY mb.row_index ASC, mb.subscription_bill_id ASC`,
-    [singlesId, storageBackend, year, month]
+    [singlesId, storageBackend, year, month, locked]
   );
   return rows.map((r) => mapRow(r, year, month));
 }
@@ -235,17 +251,19 @@ export async function getSubscriptionBill(req, res) {
     const singlesId = requireSinglesId(req);
     const { year, month } = parseYearMonth(req.query);
     const storageBackend = readBillStorageBackend(req);
+    const locked = readLockedFlag(req.query);
+    if (locked) requireSubscriptionUnlock(req, singlesId);
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const cloneInfo = await ensureMonthCloned(client, singlesId, year, month, storageBackend);
-      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
+      const cloneInfo = await ensureMonthCloned(client, singlesId, year, month, storageBackend, locked);
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend, locked);
       const peer = storageBackend === 'usb' ? 'tutaCloud' : 'usb';
       const { rows: peerCountRows } = await client.query(
         `SELECT COUNT(*)::int AS c
            FROM outdateddbsnapshotoct2024.subscription_bill
-          WHERE singles_id = $1 AND storage_backend = $2`,
-        [singlesId, peer]
+          WHERE singles_id = $1 AND storage_backend = $2 AND locked = $3`,
+        [singlesId, peer, locked]
       );
       await client.query('COMMIT');
       return res.json({
@@ -253,6 +271,7 @@ export async function getSubscriptionBill(req, res) {
         bill_month: month,
         bill_month_key: billMonthKey(year, month),
         storage_backend: storageBackend,
+        locked,
         peer_storage_backend: peer,
         peer_has_rows: (Number(peerCountRows[0]?.c) || 0) > 0,
         cloned: cloneInfo.cloned,
@@ -284,6 +303,8 @@ export async function putSubscriptionBill(req, res) {
     const singlesId = requireSinglesId(req);
     const { year, month } = parseYearMonth(req.body || {});
     const storageBackend = readBillStorageBackend(req);
+    const locked = readLockedFlag(req.body);
+    if (locked) requireSubscriptionUnlock(req, singlesId);
     const incoming = Array.isArray(req.body?.rows) ? req.body.rows : null;
     if (!incoming) throw httpError(400, 'rows array required');
     if (incoming.length > 500) throw httpError(400, 'Too many rows (max 500)');
@@ -324,9 +345,9 @@ export async function putSubscriptionBill(req, res) {
         `SELECT subscription_bill_id, paid_record_id
            FROM outdateddbsnapshotoct2024.subscription_bill
           WHERE singles_id = $1 AND storage_backend = $2
-            AND bill_year = $3 AND bill_month = $4
+            AND bill_year = $3 AND bill_month = $4 AND locked = $5
             AND paid_record_id IS NOT NULL`,
-        [singlesId, storageBackend, year, month]
+        [singlesId, storageBackend, year, month, locked]
       );
       const priorPaidByBillId = new Map(
         priorLinks.map((p) => [Number(p.subscription_bill_id), Number(p.paid_record_id)])
@@ -339,16 +360,16 @@ export async function putSubscriptionBill(req, res) {
       await client.query(
         `DELETE FROM outdateddbsnapshotoct2024.subscription_bill
           WHERE singles_id = $1 AND storage_backend = $2
-            AND bill_year = $3 AND bill_month = $4`,
-        [singlesId, storageBackend, year, month]
+            AND bill_year = $3 AND bill_month = $4 AND locked = $5`,
+        [singlesId, storageBackend, year, month, locked]
       );
       for (const r of normalized) {
         const { rows: inserted } = await client.query(
           `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
              singles_id, storage_backend, bill_year, bill_month, row_index,
              bill_description, due_day, amount, bill_type,
-             action, paid_record_id, bill_icon, email_scan_pending
-           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+             action, paid_record_id, bill_icon, email_scan_pending, locked
+           ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
            RETURNING subscription_bill_id`,
           [
             singlesId,
@@ -363,7 +384,8 @@ export async function putSubscriptionBill(req, res) {
             r.action,
             r.paid_record_id,
             r.bill_icon,
-            r.email_scan_pending
+            locked ? false : r.email_scan_pending,
+            locked
           ]
         );
         const newBillId = Number(inserted[0]?.subscription_bill_id);
@@ -376,7 +398,7 @@ export async function putSubscriptionBill(req, res) {
           );
         }
       }
-      const rows = await listMonthRows(client, singlesId, year, month, storageBackend);
+      const rows = await listMonthRows(client, singlesId, year, month, storageBackend, locked);
       await client.query('COMMIT');
       return res.json({
         ok: true,
@@ -384,6 +406,7 @@ export async function putSubscriptionBill(req, res) {
         bill_month: month,
         bill_month_key: billMonthKey(year, month),
         storage_backend: storageBackend,
+        locked,
         rows
       });
     } catch (err) {

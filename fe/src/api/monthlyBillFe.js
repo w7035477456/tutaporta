@@ -1,5 +1,10 @@
 import api from './axios';
 
+/** Header carrying the Locked Subscription unlock token (axios config fragment). */
+export function unlockHeaders(unlockToken) {
+  return unlockToken ? { headers: { 'X-Subscription-Unlock': unlockToken } } : {};
+}
+
 function withStorage(params, storageType) {
   const st = String(storageType || '').toLowerCase() === 'usb' ? 'usb' : 'tutaCloud';
   return { ...params, storageType: st };
@@ -102,17 +107,35 @@ export async function renameYearlyBillTab(fromLabel, toLabel, { storageType, yea
 }
 
 /** GET subscription month rows (server clones from prior month on first open if empty). */
-export async function fetchSubscriptionBill(year, month, { storageType } = {}) {
+export async function fetchSubscriptionBill(year, month, { storageType, locked, unlockToken } = {}) {
   const { data } = await api.get('/api/subscriptionBill', {
-    params: withStorage({ year, month }, storageType)
+    params: withStorage({ year, month, ...(locked ? { locked: 1 } : null) }, storageType),
+    ...unlockHeaders(unlockToken)
   });
   return data;
 }
 
 /** Full-replace save for one subscription calendar month. */
-export async function saveSubscriptionBill(year, month, rows, { storageType } = {}) {
-  const { data } = await api.put('/api/subscriptionBill', {
-    ...withStorage({ year, month, rows }, storageType)
+export async function saveSubscriptionBill(year, month, rows, { storageType, locked, unlockToken } = {}) {
+  const { data } = await api.put(
+    '/api/subscriptionBill',
+    { ...withStorage({ year, month, rows, ...(locked ? { locked: true } : null) }, storageType) },
+    unlockHeaders(unlockToken)
+  );
+  return data;
+}
+
+/** Locked Subscription: { hasPassword } — first unlock sets the password. */
+export async function fetchSubscriptionLockStatus() {
+  const { data } = await api.get('/api/subscriptionLock/status');
+  return data;
+}
+
+/** Locked Subscription: verify (or first-time set, with confirm) → { token, expiresAt }. */
+export async function unlockSubscriptionLock(password, confirm) {
+  const { data } = await api.post('/api/subscriptionLock/unlock', {
+    password,
+    ...(confirm != null ? { confirm } : null)
   });
   return data;
 }

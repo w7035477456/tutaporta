@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
+import api from 'api/axios';
 import ColorTemplate7PopupLargeDark from 'ui-component/ColorTemplate7PopupLargeDark';
 import RecordVaultIconPickerGrid from './RecordVaultIconPickerGrid';
 import RecordVaultIconGlyph from './RecordVaultIconGlyph';
@@ -100,22 +102,61 @@ BillIconCell.propTypes = {
   onClick: PropTypes.func
 };
 
-/** Tray of the bill icon set — picking one applies it to the bill row and closes. */
+/**
+ * Tray of the bill icon set — picking one applies it to the bill row and closes.
+ * Dragging an icon onto another spot rearranges the tray; the order is saved per user
+ * (mynote_ui_pref.bill_icon_order) and shared by Monthly / Yearly / Subscription.
+ */
 export function BillIconPickerDialog({ open, selectedIcon, onSelect, onClose }) {
+  const [iconOrder, setIconOrder] = useState(null);
+  const [orderMsg, setOrderMsg] = useState('');
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let cancelled = false;
+    setOrderMsg('');
+    api
+      .get('/api/mynoteUiPref')
+      .then(({ data }) => {
+        if (!cancelled) setIconOrder(Array.isArray(data?.bill_icon_order) ? data.bill_icon_order : null);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
+  const saveOrder = (order) => {
+    setIconOrder(order);
+    setOrderMsg('');
+    api.put('/api/mynoteUiPref/billIconOrder', { order }).catch((err) => {
+      setOrderMsg(err?.response?.data?.error || 'Could not save the icon order');
+    });
+  };
+
   return (
     <ColorTemplate7PopupLargeDark open={open} onClose={onClose} closeOnBackdrop>
       <ColorTemplate7PopupLargeDark.Body>
         <ColorTemplate7PopupLargeDark.Title>Bill Icon</ColorTemplate7PopupLargeDark.Title>
         <ColorTemplate7PopupLargeDark.BodyText>
-          Pick an icon for this bill — e.g. a car for auto insurance, a house for home insurance or mortgage.
+          Pick an icon for this bill — e.g. a car for auto insurance, a house for home insurance or mortgage. Drag an icon onto another spot
+          to rearrange; your order is saved.
         </ColorTemplate7PopupLargeDark.BodyText>
-        {selectedIcon ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', width: '100%', mb: 1 }}>
-            <ColorTemplate7PopupLargeDark.ActionButton onClick={() => onSelect?.(null)}>
-              Clear icon (show ?)
-            </ColorTemplate7PopupLargeDark.ActionButton>
+        {selectedIcon || iconOrder ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1.5, width: '100%', mb: 1 }}>
+            {selectedIcon ? (
+              <ColorTemplate7PopupLargeDark.ActionButton onClick={() => onSelect?.(null)}>
+                Clear icon (show ?)
+              </ColorTemplate7PopupLargeDark.ActionButton>
+            ) : null}
+            {iconOrder ? (
+              <ColorTemplate7PopupLargeDark.ActionButton onClick={() => saveOrder(null)}>
+                Reset icon order
+              </ColorTemplate7PopupLargeDark.ActionButton>
+            ) : null}
           </Box>
         ) : null}
+        {orderMsg ? <ColorTemplate7PopupLargeDark.ErrorBar>{orderMsg}</ColorTemplate7PopupLargeDark.ErrorBar> : null}
         <RecordVaultIconPickerGrid
           selectedIcon={selectedIcon || ''}
           onSelectIcon={(iconName) => onSelect?.(iconName)}
@@ -124,6 +165,8 @@ export function BillIconPickerDialog({ open, selectedIcon, onSelect, onClose }) 
           cellScale={BILL_ICON_TRAY_SCALE}
           fillIcons={BILL_ICON_FEATURED}
           maxHeight={billIconTrayScrollSx}
+          iconOrder={iconOrder}
+          onReorder={saveOrder}
         />
       </ColorTemplate7PopupLargeDark.Body>
     </ColorTemplate7PopupLargeDark>

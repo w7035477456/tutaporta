@@ -17,6 +17,7 @@ import { BillIconCell, BillIconPickerDialog } from './BillIconPicker';
 import BillReceiptsPopup from './BillReceiptsPopup';
 import BillScheduleEmailPrefs from './BillScheduleEmailPrefs';
 import AutoScanEmailsPopup from './AutoScanEmailsPopup';
+import SubscriptionLockDialog from './SubscriptionLockDialog';
 import {
   BILL_SCHEDULE_PENDING_ROW_STYLE,
   billScheduleApproveBtnSx,
@@ -62,6 +63,13 @@ const MONTH_NAMES = [
   'November',
   'December'
 ];
+
+/** Locked Subscription section frame + button. */
+const LOCK_RED = '#d32f2f';
+
+function isLockedError(err) {
+  return err?.response?.data?.code === 'SUBSCRIPTION_LOCKED';
+}
 
 const TONE_RANK = { overdue: 4, paid_off: 3, paid: 3, auto: 2, upcoming: 1, none: 0 };
 
@@ -154,12 +162,22 @@ export default function BillScheduleSubscriptionPanel({
   storageType: storageTypeProp,
   videoTutorialUrl = '',
   onBillScheduleTutorialClick,
-  headerRightAction = null
+  headerRightAction = null,
+  lockedSection = null
 }) {
+  /** lockedSection set → this instance is the password-protected table under the main one. */
+  const isLocked = Boolean(lockedSection);
+  const unlockToken = lockedSection?.unlockToken || null;
+  const onLockExpired = lockedSection?.onLockExpired;
   const paneStorageType = useRecordVaultPaneStorageType();
   const now = useMemo(() => new Date(), []);
-  const [year, setYear] = useState(now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() + 1);
+  const [ownYear, setYear] = useState(now.getFullYear());
+  const [ownMonth, setMonth] = useState(now.getMonth() + 1);
+  const year = isLocked ? lockedSection.year : ownYear;
+  const month = isLocked ? lockedSection.month : ownMonth;
+  /** Main table only: unlock token for the Locked Subscription table (memory only). */
+  const [lockToken, setLockToken] = useState(null);
+  const [lockDialogOpen, setLockDialogOpen] = useState(false);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -190,6 +208,9 @@ export default function BillScheduleSubscriptionPanel({
   const sideLabel = storageKey === 'usb' ? 'USB' : 'Cloud';
   const peerLabel = peerKey === 'usb' ? 'USB' : 'Cloud';
 
+  /** Locked table only lives while its token is valid; drop it when the server says it expired. */
+  const relock = useCallback(() => setLockToken(null), []);
+
   const load = useCallback(async (y, m) => {
     setLoading(true);
     setError('');
@@ -197,17 +218,22 @@ export default function BillScheduleSubscriptionPanel({
     setDirty(false);
     setDeleteUndoStack([]);
     try {
-      const data = await fetchSubscriptionBill(y, m, { storageType: storageKey });
+      const data = await fetchSubscriptionBill(y, m, {
+        storageType: storageKey,
+        locked: isLocked,
+        unlockToken
+      });
       setRows(withDerived(data?.rows || [], y, m));
-      setPeerHasRows(Boolean(data?.peer_has_rows));
+      setPeerHasRows(!isLocked && Boolean(data?.peer_has_rows));
     } catch (err) {
+      if (isLockedError(err)) onLockExpired?.();
       setError(err?.response?.data?.error || err?.message || 'Failed to load subscription bills');
       setRows([]);
       setPeerHasRows(false);
     } finally {
       setLoading(false);
     }
-  }, [storageKey]);
+  }, [storageKey, isLocked, unlockToken, onLockExpired]);
 
   useEffect(() => {
     void load(year, month);
@@ -282,20 +308,25 @@ export default function BillScheduleSubscriptionPanel({
           bill_icon: r.bill_icon || null,
           email_scan_pending: r.email_scan_pending === true
         }));
-        const data = await saveSubscriptionBill(year, month, payload, { storageType: storageKey });
+        const data = await saveSubscriptionBill(year, month, payload, {
+          storageType: storageKey,
+          locked: isLocked,
+          unlockToken
+        });
         const next = withDerived(data?.rows || [], year, month);
         setRows(next);
         setSavedMsg('Saved');
         setDirty(false);
         return next;
       } catch (err) {
+        if (isLockedError(err)) onLockExpired?.();
         setError(err?.response?.data?.error || err?.message || 'Failed to save');
         return null;
       } finally {
         setSaving(false);
       }
     },
-    [year, month, storageKey]
+    [year, month, storageKey, isLocked, unlockToken, onLockExpired]
   );
 
   /** Saves pending edits first (renumbers rows), then returns the Bills/Receipts ensure payload for the row. */
@@ -322,7 +353,8 @@ export default function BillScheduleSubscriptionPanel({
       due_day: target.due_day === '' ? null : target.due_day,
       amount: target.amount,
       bill_type: target.bill_type,
-      action: target.action
+      action: target.action,
+      ...(isLocked ? { locked: true, unlockToken } : null)
     };
   };
 
@@ -517,6 +549,269 @@ export default function BillScheduleSubscriptionPanel({
     }
   };
 
+  const tableEl = (
+    <Box component="table" sx={billScheduleTableSx}>
+      <thead>
+        <tr>
+          <th style={{ width: 40 }}>#</th>
+          <th style={{ width: 48, textAlign: 'center' }}>Icon</th>
+          <th style={{ ...descColumnStyle, position: 'relative' }}>
+            Bill Description
+            <BillScheduleDescColumnResizeHandle
+              onPointerDown={startDescColumnResize}
+              onReset={resetDescColumnWidth}
+            />
+          </th>
+          <th style={{ width: 88 }}>Due Date</th>
+          <th style={{ width: 120 }}>Amount</th>
+          <th style={{ width: 72, textAlign: 'center' }}>Bill</th>
+          <th style={{ width: 110 }}>Type</th>
+          <th style={{ width: 120 }}>Action</th>
+          <th style={{ width: 110 }}>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row, index) => {
+          const auto = row.bill_type === 'Auto';
+          const paidOff = isPaidOffType(row.bill_type);
+          const typeActionStatusBg = auto ? YELLOW : 'transparent';
+          const paid = !auto && !paidOff && row.status_tone === 'paid';
+          const rowGrey = paid || paidOff;
+          const statusBg = auto ? YELLOW : rowGrey ? 'transparent' : cellToneBg(row.status_tone);
+          return (
+            <tr
+              key={`bill-row-${row.row_index}-${index}`}
+              style={{
+                ...(rowGrey ? { background: PAID_ROW_BG } : null),
+                ...(row.email_scan_pending ? BILL_SCHEDULE_PENDING_ROW_STYLE : null)
+              }}
+            >
+              <td style={{ textAlign: 'center', fontWeight: 700 }}>{index + 1}</td>
+              <td style={{ textAlign: 'center' }}>
+                <BillIconCell
+                  iconName={row.bill_icon}
+                  disabled={loading || saving}
+                  onClick={() => setIconPickerIndex(index)}
+                />
+              </td>
+              <td style={descColumnStyle}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={row.bill_description}
+                    onChange={(e) => updateRow(index, { bill_description: e.target.value })}
+                    placeholder="Bill description"
+                    sx={{ ...inputSx, flex: 1, minWidth: 0 }}
+                  />
+                  {row.email_scan_pending ? (
+                    <Box
+                      component="button"
+                      type="button"
+                      aria-label="Approve scanned bill"
+                      disabled={loading || saving}
+                      onClick={() => void handleApproveRow(index)}
+                      sx={billScheduleApproveBtnSx}
+                    >
+                      Approve
+                    </Box>
+                  ) : null}
+                  <Box
+                    component="button"
+                    type="button"
+                    aria-label="Remove row"
+                    disabled={loading || saving}
+                    onClick={() => void handleRemoveRow(index)}
+                    sx={billScheduleRemoveRowBtnSx}
+                  >
+                    ×
+                  </Box>
+                </Box>
+              </td>
+              <td>
+                <BillDueDayInput
+                  value={row.due_day ?? ''}
+                  year={year}
+                  month={month}
+                  onChange={(day) => updateRow(index, { due_day: day })}
+                  sx={inputSx}
+                />
+              </td>
+              <td>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={row.amount}
+                  onChange={(e) => updateRow(index, { amount: e.target.value })}
+                  onBlur={() => updateRow(index, { amount: normalizeAmountLocal(row.amount) })}
+                  placeholder="$0.00"
+                  sx={inputSx}
+                />
+              </td>
+              <td style={{ textAlign: 'center' }}>
+                <BillColumnButton
+                  hasContent={Boolean(row.has_bill_content)}
+                  disabled={loading || saving || attachingRowIndex != null}
+                  onClick={() => void openBillForRow(row)}
+                  onDropAttach={(dataTransfer) => void dropAttachOnRow(row, dataTransfer)}
+                />
+              </td>
+              <td style={{ background: typeActionStatusBg }}>
+                <Select
+                  fullWidth
+                  size="small"
+                  value={row.bill_type || 'Manual'}
+                  onChange={(e) => updateRow(index, { bill_type: e.target.value })}
+                  sx={{
+                    ...selectSx,
+                    bgcolor: auto
+                      ? YELLOW
+                      : rowGrey
+                        ? 'transparent'
+                        : BILL_SCHEDULE_SURFACE,
+                    ...(auto
+                      ? {
+                          color: AUTO_PAY_TEXT,
+                          WebkitTextFillColor: AUTO_PAY_TEXT,
+                          '& .MuiSelect-select': {
+                            color: AUTO_PAY_TEXT,
+                            WebkitTextFillColor: AUTO_PAY_TEXT
+                          },
+                          '& .MuiSelect-icon': { color: AUTO_PAY_TEXT }
+                        }
+                      : null)
+                  }}
+                >
+                  <MenuItem value="Auto">Auto</MenuItem>
+                  <MenuItem value="Manual">Manual</MenuItem>
+                  <MenuItem value="Paid Off">Paid Off</MenuItem>
+                </Select>
+              </td>
+              <td style={{ background: typeActionStatusBg }}>
+                {auto || paidOff ? null : (
+                  <Select
+                    fullWidth
+                    size="small"
+                    displayEmpty
+                    value={row.action || ''}
+                    onChange={(e) => {
+                      const next = e.target.value || null;
+                      if (next === 'Paid') {
+                        void openBillForRow(rowsRef.current[index], { payMode: true });
+                        return;
+                      }
+                      updateRow(index, { action: next });
+                    }}
+                    sx={paid ? { ...selectSx, bgcolor: 'transparent' } : selectSx}
+                    renderValue={(v) => {
+                      if (!v) return <em style={{ opacity: 0.5 }}>Select</em>;
+                      return v;
+                    }}
+                  >
+                    <MenuItem value="Not Paid">Not Paid</MenuItem>
+                    <MenuItem value="Paid">Paid</MenuItem>
+                  </Select>
+                )}
+              </td>
+              <td
+                style={{
+                  background: statusBg,
+                  fontWeight: 800,
+                  textAlign: 'center',
+                  color: row.status_tone === 'overdue' ? '#fff' : BILL_SCHEDULE_INK
+                }}
+              >
+                {auto || paidOff ? '' : row.status}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </Box>
+  );
+
+  const messagesEl = (
+    <>
+      {error ? (
+        <Typography sx={{ color: RED, fontWeight: 700, flexShrink: 0 }}>{error}</Typography>
+      ) : null}
+      {savedMsg ? (
+        <Typography sx={{ color: '#1b7a3d', fontWeight: 700, flexShrink: 0 }}>{savedMsg}</Typography>
+      ) : null}
+      {loading ? (
+        <Typography sx={{ fontWeight: 600, flexShrink: 0 }}>Loading…</Typography>
+      ) : null}
+    </>
+  );
+
+  const rowPopupsEl = (
+    <>
+      <BillIconPickerDialog
+        open={iconPickerIndex != null}
+        selectedIcon={iconPickerIndex != null ? rows[iconPickerIndex]?.bill_icon : null}
+        onSelect={(iconName) => void handlePickBillIcon(iconName)}
+        onClose={() => setIconPickerIndex(null)}
+      />
+      {billPopupOpen ? (
+        <BillReceiptsPopup
+          open={billPopupOpen}
+          storageType={storageKey}
+          ensurePayload={billEnsurePayload}
+          onClose={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
+          onMarkPaid={() => void finishBillPopup('Paid')}
+          onCancel={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
+          onChanged={handleBillChanged}
+        />
+      ) : null}
+    </>
+  );
+
+  if (isLocked) {
+    return (
+      <Box
+        sx={{
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 1.5,
+          p: 1.5,
+          border: `3px dashed ${LOCK_RED}`,
+          borderRadius: 2
+        }}
+      >
+        <Typography sx={{ fontWeight: 800, fontSize: '1.15rem' }}>
+          🔓 Locked Subscription Bills: {MONTH_NAMES[month - 1]}
+        </Typography>
+        {messagesEl}
+        {tableEl}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ColorTemplate13DisableGreenButton type="button" onClick={() => void handleAdd()} disabled={loading || saving}>
+              Add
+            </ColorTemplate13DisableGreenButton>
+            <ColorTemplate13DisableGreenButton
+              type="button"
+              activeVariant="primary"
+              onClick={() => void handleUndoDelete()}
+              disabled={loading || saving || deleteUndoStack.length === 0}
+            >
+              Undo Delete{deleteUndoStack.length > 1 ? ` (${deleteUndoStack.length})` : ''}
+            </ColorTemplate13DisableGreenButton>
+          </Box>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            onClick={() => void handleSave()}
+            disabled={loading || saving}
+            sx={dirty && !saving ? { animation: 'blink 1s step-start infinite' } : undefined}
+          >
+            {saving ? 'Saving…' : 'SAVE'}
+          </ColorTemplate13DisableGreenButton>
+        </Box>
+        {rowPopupsEl}
+      </Box>
+    );
+  }
+
   return (
     <Box
       sx={{
@@ -605,194 +900,9 @@ export default function BillScheduleSubscriptionPanel({
         </Box>
       ) : null}
 
-      {error ? (
-        <Typography sx={{ color: RED, fontWeight: 700, flexShrink: 0 }}>{error}</Typography>
-      ) : null}
-      {savedMsg ? (
-        <Typography sx={{ color: '#1b7a3d', fontWeight: 700, flexShrink: 0 }}>{savedMsg}</Typography>
-      ) : null}
-      {loading ? (
-        <Typography sx={{ fontWeight: 600, flexShrink: 0 }}>Loading…</Typography>
-      ) : null}
+      {messagesEl}
 
-      <Box component="table" sx={billScheduleTableSx}>
-        <thead>
-          <tr>
-            <th style={{ width: 40 }}>#</th>
-            <th style={{ width: 48, textAlign: 'center' }}>Icon</th>
-            <th style={{ ...descColumnStyle, position: 'relative' }}>
-              Bill Description
-              <BillScheduleDescColumnResizeHandle
-                onPointerDown={startDescColumnResize}
-                onReset={resetDescColumnWidth}
-              />
-            </th>
-            <th style={{ width: 88 }}>Due Date</th>
-            <th style={{ width: 120 }}>Amount</th>
-            <th style={{ width: 72, textAlign: 'center' }}>Bill</th>
-            <th style={{ width: 110 }}>Type</th>
-            <th style={{ width: 120 }}>Action</th>
-            <th style={{ width: 110 }}>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => {
-            const auto = row.bill_type === 'Auto';
-            const paidOff = isPaidOffType(row.bill_type);
-            const typeActionStatusBg = auto ? YELLOW : 'transparent';
-            const paid = !auto && !paidOff && row.status_tone === 'paid';
-            const rowGrey = paid || paidOff;
-            const statusBg = auto ? YELLOW : rowGrey ? 'transparent' : cellToneBg(row.status_tone);
-            return (
-              <tr
-                key={`bill-row-${row.row_index}-${index}`}
-                style={{
-                  ...(rowGrey ? { background: PAID_ROW_BG } : null),
-                  ...(row.email_scan_pending ? BILL_SCHEDULE_PENDING_ROW_STYLE : null)
-                }}
-              >
-                <td style={{ textAlign: 'center', fontWeight: 700 }}>{index + 1}</td>
-                <td style={{ textAlign: 'center' }}>
-                  <BillIconCell
-                    iconName={row.bill_icon}
-                    disabled={loading || saving}
-                    onClick={() => setIconPickerIndex(index)}
-                  />
-                </td>
-                <td style={descColumnStyle}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={row.bill_description}
-                      onChange={(e) => updateRow(index, { bill_description: e.target.value })}
-                      placeholder="Bill description"
-                      sx={{ ...inputSx, flex: 1, minWidth: 0 }}
-                    />
-                    {row.email_scan_pending ? (
-                      <Box
-                        component="button"
-                        type="button"
-                        aria-label="Approve scanned bill"
-                        disabled={loading || saving}
-                        onClick={() => void handleApproveRow(index)}
-                        sx={billScheduleApproveBtnSx}
-                      >
-                        Approve
-                      </Box>
-                    ) : null}
-                    <Box
-                      component="button"
-                      type="button"
-                      aria-label="Remove row"
-                      disabled={loading || saving}
-                      onClick={() => void handleRemoveRow(index)}
-                      sx={billScheduleRemoveRowBtnSx}
-                    >
-                      ×
-                    </Box>
-                  </Box>
-                </td>
-                <td>
-                  <BillDueDayInput
-                    value={row.due_day ?? ''}
-                    year={year}
-                    month={month}
-                    onChange={(day) => updateRow(index, { due_day: day })}
-                    sx={inputSx}
-                  />
-                </td>
-                <td>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    value={row.amount}
-                    onChange={(e) => updateRow(index, { amount: e.target.value })}
-                    onBlur={() => updateRow(index, { amount: normalizeAmountLocal(row.amount) })}
-                    placeholder="$0.00"
-                    sx={inputSx}
-                  />
-                </td>
-                <td style={{ textAlign: 'center' }}>
-                  <BillColumnButton
-                    hasContent={Boolean(row.has_bill_content)}
-                    disabled={loading || saving || attachingRowIndex != null}
-                    onClick={() => void openBillForRow(row)}
-                    onDropAttach={(dataTransfer) => void dropAttachOnRow(row, dataTransfer)}
-                  />
-                </td>
-                <td style={{ background: typeActionStatusBg }}>
-                  <Select
-                    fullWidth
-                    size="small"
-                    value={row.bill_type || 'Manual'}
-                    onChange={(e) => updateRow(index, { bill_type: e.target.value })}
-                    sx={{
-                      ...selectSx,
-                      bgcolor: auto
-                        ? YELLOW
-                        : rowGrey
-                          ? 'transparent'
-                          : BILL_SCHEDULE_SURFACE,
-                      ...(auto
-                        ? {
-                            color: AUTO_PAY_TEXT,
-                            WebkitTextFillColor: AUTO_PAY_TEXT,
-                            '& .MuiSelect-select': {
-                              color: AUTO_PAY_TEXT,
-                              WebkitTextFillColor: AUTO_PAY_TEXT
-                            },
-                            '& .MuiSelect-icon': { color: AUTO_PAY_TEXT }
-                          }
-                        : null)
-                    }}
-                  >
-                    <MenuItem value="Auto">Auto</MenuItem>
-                    <MenuItem value="Manual">Manual</MenuItem>
-                    <MenuItem value="Paid Off">Paid Off</MenuItem>
-                  </Select>
-                </td>
-                <td style={{ background: typeActionStatusBg }}>
-                  {auto || paidOff ? null : (
-                    <Select
-                      fullWidth
-                      size="small"
-                      displayEmpty
-                      value={row.action || ''}
-                      onChange={(e) => {
-                        const next = e.target.value || null;
-                        if (next === 'Paid') {
-                          void openBillForRow(rowsRef.current[index], { payMode: true });
-                          return;
-                        }
-                        updateRow(index, { action: next });
-                      }}
-                      sx={paid ? { ...selectSx, bgcolor: 'transparent' } : selectSx}
-                      renderValue={(v) => {
-                        if (!v) return <em style={{ opacity: 0.5 }}>Select</em>;
-                        return v;
-                      }}
-                    >
-                      <MenuItem value="Not Paid">Not Paid</MenuItem>
-                      <MenuItem value="Paid">Paid</MenuItem>
-                    </Select>
-                  )}
-                </td>
-                <td
-                  style={{
-                    background: statusBg,
-                    fontWeight: 800,
-                    textAlign: 'center',
-                    color: row.status_tone === 'overdue' ? '#fff' : BILL_SCHEDULE_INK
-                  }}
-                >
-                  {auto || paidOff ? '' : row.status}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </Box>
+      {tableEl}
 
       <Box
         sx={{
@@ -815,6 +925,23 @@ export default function BillScheduleSubscriptionPanel({
           >
             Undo Delete{deleteUndoStack.length > 1 ? ` (${deleteUndoStack.length})` : ''}
           </ColorTemplate13DisableGreenButton>
+          <ColorTemplate13DisableGreenButton
+            type="button"
+            aria-pressed={Boolean(lockToken)}
+            aria-label={lockToken ? 'Lock the Locked Subscription table' : 'Unlock the Locked Subscription table'}
+            onClick={() => (lockToken ? setLockToken(null) : setLockDialogOpen(true))}
+            sx={{
+              '&, &:hover, &:focus-visible': {
+                bgcolor: '#ffffff',
+                color: BILL_SCHEDULE_INK,
+                WebkitTextFillColor: BILL_SCHEDULE_INK
+              },
+              outline: `3px solid ${LOCK_RED}`,
+              outlineOffset: 1
+            }}
+          >
+            {lockToken ? '🔓 Lock' : '🔒 Unlock'}
+          </ColorTemplate13DisableGreenButton>
         </Box>
         <ColorTemplate13DisableGreenButton type="button" onClick={() => setAutoScanOpen(true)} disabled={loading}>
           Auto Scan Emails
@@ -832,6 +959,13 @@ export default function BillScheduleSubscriptionPanel({
           {saving ? 'Saving…' : 'SAVE'}
         </ColorTemplate13DisableGreenButton>
       </Box>
+
+      {lockToken ? (
+        <BillScheduleSubscriptionPanel
+          storageType={storageKey}
+          lockedSection={{ year, month, unlockToken: lockToken, onLockExpired: relock }}
+        />
+      ) : null}
 
       <BillScheduleEmailPrefs />
 
@@ -1044,13 +1178,6 @@ export default function BillScheduleSubscriptionPanel({
         </Box>
       </Box>
 
-      <BillIconPickerDialog
-        open={iconPickerIndex != null}
-        selectedIcon={iconPickerIndex != null ? rows[iconPickerIndex]?.bill_icon : null}
-        onSelect={(iconName) => void handlePickBillIcon(iconName)}
-        onClose={() => setIconPickerIndex(null)}
-      />
-
       <AutoScanEmailsPopup
         open={autoScanOpen}
         onClose={() => setAutoScanOpen(false)}
@@ -1058,17 +1185,16 @@ export default function BillScheduleSubscriptionPanel({
         onScanFinished={handleAutoScanFinished}
       />
 
-      {billPopupOpen ? (
-        <BillReceiptsPopup
-          open={billPopupOpen}
-          storageType={storageKey}
-          ensurePayload={billEnsurePayload}
-          onClose={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
-          onMarkPaid={() => void finishBillPopup('Paid')}
-          onCancel={() => void finishBillPopup(billPopupPayMode ? 'Not Paid' : null)}
-          onChanged={handleBillChanged}
-        />
-      ) : null}
+      {rowPopupsEl}
+
+      <SubscriptionLockDialog
+        open={lockDialogOpen}
+        onCancel={() => setLockDialogOpen(false)}
+        onUnlocked={({ token }) => {
+          setLockDialogOpen(false);
+          setLockToken(token);
+        }}
+      />
     </Box>
   );
 }
@@ -1077,5 +1203,11 @@ BillScheduleSubscriptionPanel.propTypes = {
   storageType: PropTypes.oneOf(['tutaCloud', 'usb']),
   videoTutorialUrl: PropTypes.string,
   onBillScheduleTutorialClick: PropTypes.func,
-  headerRightAction: PropTypes.node
+  headerRightAction: PropTypes.node,
+  lockedSection: PropTypes.shape({
+    year: PropTypes.number.isRequired,
+    month: PropTypes.number.isRequired,
+    unlockToken: PropTypes.string.isRequired,
+    onLockExpired: PropTypes.func
+  })
 };

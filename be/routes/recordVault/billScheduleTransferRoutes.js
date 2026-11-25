@@ -92,11 +92,13 @@ async function copySubscription(client, singlesId, source, target) {
   await client.query(
     `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
        singles_id, storage_backend, bill_year, bill_month, row_index,
-       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
+       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending,
+       locked
      )
      SELECT
        singles_id, $3, bill_year, bill_month, row_index,
-       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending
+       bill_description, due_day, amount, bill_type, action, paid_record_id, bill_icon, email_scan_pending,
+       locked
        FROM outdateddbsnapshotoct2024.subscription_bill
       WHERE singles_id = $1 AND storage_backend = $2`,
     [singlesId, source, target]

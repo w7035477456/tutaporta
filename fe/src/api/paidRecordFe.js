@@ -75,12 +75,18 @@ function mapPaidRecord(data) {
 
 /** POST /api/paidRecord/ensure — create/link paid_record for a bill row. */
 export async function ensurePaidRecord(payload, { storageType } = {}) {
-  const body = { ...(payload || {}) };
+  // unlockToken (Locked Subscription rows) travels as a header, never in the JSON body.
+  const { unlockToken, ...rest } = payload || {};
+  const body = { ...rest };
   if (storageType != null) {
     body.storageType = storageType;
     body.storage_backend = storageType;
   }
-  const { data } = await api.post('/api/paidRecord/ensure', body);
+  const { data } = await api.post(
+    '/api/paidRecord/ensure',
+    body,
+    unlockToken ? { headers: { 'X-Subscription-Unlock': unlockToken } } : undefined
+  );
   return mapPaidRecord(data);
 }
 

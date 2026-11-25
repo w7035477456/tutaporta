@@ -7,6 +7,7 @@ import {
   readPaidRecordAttachmentFile,
   deletePaidRecordAttachmentFile
 } from '../../utils/paidRecordStorage.js';
+import { requireSubscriptionUnlock } from '../../utils/subscriptionLockToken.js';
 
 export const SKIP_DUPLICATE_UPLOAD_MESSAGE = 'Skipping upload duplicate file';
 
@@ -449,15 +450,18 @@ export async function postPaidRecordEnsure(req, res) {
       if (!month || month < 1 || month > 12) throw httpError(400, 'month must be 1–12');
       monthlyBillId = null;
       yearlyBillId = null;
+      const lockedRow = body.locked === true || /^(1|true)$/i.test(String(body.locked ?? ''));
+      if (lockedRow) requireSubscriptionUnlock(req, singlesId);
       if (subscriptionBillId && subscriptionBillId > 0) {
         const { rows } = await client.query(
-          `SELECT subscription_bill_id, paid_record_id
+          `SELECT subscription_bill_id, paid_record_id, locked
              FROM outdateddbsnapshotoct2024.subscription_bill
             WHERE subscription_bill_id = $1 AND singles_id = $2 AND storage_backend = $3
             LIMIT 1`,
           [subscriptionBillId, singlesId, storageBackend]
         );
         if (!rows[0]) throw httpError(404, 'subscription_bill row not found');
+        if (rows[0].locked) requireSubscriptionUnlock(req, singlesId);
         subscriptionBillId = Number(rows[0].subscription_bill_id);
         paidRecordId = rows[0].paid_record_id != null ? Number(rows[0].paid_record_id) : null;
       } else {
@@ -465,9 +469,9 @@ export async function postPaidRecordEnsure(req, res) {
           `SELECT subscription_bill_id, paid_record_id
              FROM outdateddbsnapshotoct2024.subscription_bill
             WHERE singles_id = $1 AND storage_backend = $2
-              AND bill_year = $3 AND bill_month = $4 AND row_index = $5
+              AND bill_year = $3 AND bill_month = $4 AND row_index = $5 AND locked = $6
             LIMIT 1`,
-          [singlesId, storageBackend, year, month, rowIndex]
+          [singlesId, storageBackend, year, month, rowIndex, lockedRow]
         );
         if (existing[0]) {
           subscriptionBillId = Number(existing[0].subscription_bill_id);
@@ -492,8 +496,8 @@ export async function postPaidRecordEnsure(req, res) {
           const { rows: inserted } = await client.query(
             `INSERT INTO outdateddbsnapshotoct2024.subscription_bill (
                singles_id, storage_backend, bill_year, bill_month, row_index,
-               bill_description, due_day, amount, bill_type, action, paid_record_id
-             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL)
+               bill_description, due_day, amount, bill_type, action, paid_record_id, locked
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NULL,$11)
              RETURNING subscription_bill_id, paid_record_id`,
             [
               singlesId,
@@ -505,7 +509,8 @@ export async function postPaidRecordEnsure(req, res) {
               dueDay && dueDay >= 1 && dueDay <= 31 ? dueDay : null,
               amount,
               billType,
-              action
+              action,
+              lockedRow
             ]
           );
           subscriptionBillId = Number(inserted[0].subscription_bill_id);

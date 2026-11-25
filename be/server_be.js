@@ -598,6 +598,10 @@ import {
   getSubscriptionBill,
   putSubscriptionBill
 } from './routes/recordVault/subscriptionBillRoutes.js';
+import {
+  getSubscriptionLockStatus,
+  postSubscriptionUnlock
+} from './routes/recordVault/subscriptionLockRoutes.js';
 import { transferBillSchedule } from './routes/recordVault/billScheduleTransferRoutes.js';
 import { getTodoItems, putTodoItems } from './routes/recordVault/todoItemRoutes.js';
 import {
@@ -607,7 +611,7 @@ import {
   postSmsReminder
 } from './routes/recordVault/smsReminderRoutes.js';
 import { initSmsReminderSchema, startSmsReminderJob } from './utils/smsReminder.js';
-import { getMynoteUiPref, putMynoteUiPref } from './routes/recordVault/mynoteUiPrefRoutes.js';
+import { getMynoteUiPref, putMynoteUiPref, putBillIconOrder } from './routes/recordVault/mynoteUiPrefRoutes.js';
 import {
   getEmailScanStatus,
   postEmailScanInbox,
@@ -1889,6 +1893,8 @@ app.post('/api/yearlyBill/tab/undelete', requireAuth, postYearlyBillTabUndelete)
 app.post('/api/yearlyBill/tab/rename', requireAuth, postYearlyBillTabRename);
 app.get('/api/subscriptionBill', requireAuth, getSubscriptionBill);
 app.put('/api/subscriptionBill', requireAuth, putSubscriptionBill);
+app.get('/api/subscriptionLock/status', requireAuth, getSubscriptionLockStatus);
+app.post('/api/subscriptionLock/unlock', requireAuth, postSubscriptionUnlock);
 app.get('/api/todoItems', requireAuth, getTodoItems);
 app.put('/api/todoItems', requireAuth, putTodoItems);
 app.get('/api/smsReminder/defaults', requireAuth, getSmsReminderDefaults);
@@ -1897,6 +1903,7 @@ app.post('/api/smsReminder', requireAuth, postSmsReminder);
 app.delete('/api/smsReminder/:id', requireAuth, deleteSmsReminder);
 app.get('/api/mynoteUiPref', requireAuth, getMynoteUiPref);
 app.put('/api/mynoteUiPref', requireAuth, putMynoteUiPref);
+app.put('/api/mynoteUiPref/billIconOrder', requireAuth, putBillIconOrder);
 app.post('/api/billSchedule/transfer', requireAuth, transferBillSchedule);
 app.post('/api/emailScan/inbox', requireAuth, postEmailScanInbox);
 app.get('/api/emailScan/status', requireAuth, getEmailScanStatus);

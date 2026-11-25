@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import { getFontAwesome5ObjectIconDefinition, getFontAwesome5ObjectIconNames } from 'utils/fontAwesome5ObjectIcons';
@@ -11,6 +11,18 @@ import RecordVaultIconGlyph, { RECORD_VAULT_HOURGLASS_ICON_NAME } from './Record
 export const RECORD_VAULT_ICON_PICKER_COLUMNS = 10;
 export const RECORD_VAULT_ICON_PICKER_CELL_PX = 44;
 export const RECORD_VAULT_ICON_PICKER_GAP_PX = 8;
+
+const ICON_DRAG_MIME = 'application/x-tutanotes-icon';
+
+/** Move `dragged` onto `target`'s spot (items between shift by one). */
+export function moveIconInOrder(order, dragged, target) {
+  const from = order.indexOf(dragged);
+  const to = order.indexOf(target);
+  if (from < 0 || to < 0 || from === to) return order;
+  const next = order.filter((n) => n !== dragged);
+  next.splice(to, 0, dragged);
+  return next;
+}
 
 const iconTooltipSlotProps = {
   tooltip: {
@@ -43,14 +55,39 @@ export default function RecordVaultIconPickerGrid({
   ariaLabelPrefix = 'Select icon',
   pinnedIcons = null,
   cellScale = 1,
-  fillIcons = null
+  fillIcons = null,
+  iconOrder = null,
+  onReorder = null
 }) {
-  const iconNames = useMemo(() => {
+  const defaultNames = useMemo(() => {
     const all = getFontAwesome5ObjectIconNames();
     if (!pinnedIcons?.length) return all;
     const pinned = pinnedIcons.filter((name) => all.includes(name) || isBillCompositeIconName(name));
     return [...pinned, ...all.filter((name) => !pinned.includes(name))];
   }, [pinnedIcons]);
+
+  /** Saved order first (unknown names dropped), then any icon not in it yet. */
+  const iconNames = useMemo(() => {
+    if (!iconOrder?.length) return defaultNames;
+    const known = new Set(defaultNames);
+    const saved = iconOrder.filter((n) => known.has(n));
+    const savedSet = new Set(saved);
+    return [...saved, ...defaultNames.filter((n) => !savedSet.has(n))];
+  }, [defaultNames, iconOrder]);
+
+  const canDrag = Boolean(onReorder) && !disabled;
+  const [dragName, setDragName] = useState(null);
+  const [overName, setOverName] = useState(null);
+
+  const dropOn = (target, e) => {
+    e.preventDefault();
+    const dragged = e.dataTransfer.getData(ICON_DRAG_MIME) || dragName;
+    setDragName(null);
+    setOverName(null);
+    if (!dragged || dragged === target) return;
+    const next = moveIconInOrder(iconNames, dragged, target);
+    if (next !== iconNames) onReorder(next);
+  };
 
   return (
     <Box
@@ -74,6 +111,7 @@ export default function RecordVaultIconPickerGrid({
           const definition = isHourglass || isBillCompositeIconName(iconName) ? true : getFontAwesome5ObjectIconDefinition(iconName);
           if (!definition) return null;
           const selected = selectedIcon === iconName;
+          const dropTarget = canDrag && overName === iconName && dragName && dragName !== iconName;
           const label = formatIconDisplayName(iconName);
           const cellPx = Math.round(RECORD_VAULT_ICON_PICKER_CELL_PX * cellScale);
           // Fill icons reach almost to the 2px border; the rest keep the normal icon-to-box ratio.
@@ -86,6 +124,35 @@ export default function RecordVaultIconPickerGrid({
                 aria-label={`${ariaLabelPrefix} ${label}`}
                 disabled={disabled}
                 onClick={() => onSelectIcon?.(iconName)}
+                draggable={canDrag}
+                onDragStart={
+                  canDrag
+                    ? (e) => {
+                        e.dataTransfer.setData(ICON_DRAG_MIME, iconName);
+                        e.dataTransfer.effectAllowed = 'move';
+                        setDragName(iconName);
+                      }
+                    : undefined
+                }
+                onDragEnd={
+                  canDrag
+                    ? () => {
+                        setDragName(null);
+                        setOverName(null);
+                      }
+                    : undefined
+                }
+                onDragOver={
+                  canDrag
+                    ? (e) => {
+                        if (!dragName) return;
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = 'move';
+                        if (overName !== iconName) setOverName(iconName);
+                      }
+                    : undefined
+                }
+                onDrop={canDrag ? (e) => dropOn(iconName, e) : undefined}
                 sx={{
                   width: '100%',
                   maxWidth: cellPx,
@@ -100,8 +167,10 @@ export default function RecordVaultIconPickerGrid({
                   borderRadius: 1,
                   bgcolor: selected ? '#c62828' : 'transparent',
                   color: selected ? '#fff' : 'var(--theme-inverse-daynight-color)',
-                  cursor: disabled ? 'not-allowed' : 'pointer',
-                  opacity: disabled ? 0.55 : 1,
+                  cursor: disabled ? 'not-allowed' : canDrag ? 'grab' : 'pointer',
+                  opacity: disabled ? 0.55 : dragName === iconName ? 0.35 : 1,
+                  outline: dropTarget ? '3px dashed #c62828' : 'none',
+                  outlineOffset: 2,
                   p: 0
                 }}
               >
@@ -126,5 +195,9 @@ RecordVaultIconPickerGrid.propTypes = {
   /** Scales every cell and its icon (1 = 44px cells, 24px icons). */
   cellScale: PropTypes.number,
   /** Icon names whose glyph fills its cell almost to the border. */
-  fillIcons: PropTypes.arrayOf(PropTypes.string)
+  fillIcons: PropTypes.arrayOf(PropTypes.string),
+  /** Saved per-user order (icon names); icons missing from it follow in default order. */
+  iconOrder: PropTypes.arrayOf(PropTypes.string),
+  /** Set → icons can be dragged onto another icon's spot; called with the full new order. */
+  onReorder: PropTypes.func
 };
