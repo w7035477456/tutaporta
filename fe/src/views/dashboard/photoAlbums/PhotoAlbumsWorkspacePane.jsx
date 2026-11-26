@@ -1325,7 +1325,7 @@ function MenuRowButton({
 }) {
   const useDivDragSurface = Boolean(draggable);
   const lookSelected = selected || multiSelected;
-  // Search hit on the open album: blue. Otherwise current album-set / album: yellow + black.
+  // Selected album-set (list + Shortcut): blue (selectedBlue). Selected album: green.
   const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
   const currentGreen = Boolean(lookSelected && !locked && !searchHitBlue);
   const rowClass = locked ? undefined : currentGreen ? MENU_ROW_CURRENT_CLASS : searchHitBlue ? undefined : MENU_ROW_IDLE_CLASS;
@@ -1385,6 +1385,8 @@ function ShortcutMenuRow({
   shortcut,
   label,
   selected,
+  /** Album-set shortcut: selected colour blue (album shortcut stays green). */
+  selectedBlue = false,
   locked = false,
   draggingId,
   dropTargetId,
@@ -1416,6 +1418,7 @@ function ShortcutMenuRow({
     >
       <MenuRowButton
         selected={selected}
+        selectedBlue={selectedBlue}
         locked={locked}
         draggable={!disabled}
         title={locked ? 'Locked — enter PIN to open' : 'Drag to reorder; click to open'}
@@ -2198,9 +2201,9 @@ export default function PhotoAlbumsWorkspacePane({
   const activeSearchTerms = appliedSearchTerms;
 
   // Search never prunes the tree: every notebook (and every note) stays visible on
-  // the left. A match is shown purely by selection styling — the containing
-  // notebook goes white (selected) and the matched note goes blue (selectedBlue) —
-  // so the user keeps their full notebook list while jumping between hits.
+  // the left. A match is shown purely by selection styling — containing album-set blue,
+  // matched album green (same colors as any selection) — so the user keeps their full
+  // notebook list while jumping between hits.
   const displayNotebooks = notebooks;
 
   // Must be declared before any useCallback that lists `notes` in deps (TDZ).
@@ -8171,6 +8174,7 @@ export default function PhotoAlbumsWorkspacePane({
                                               : undefined
                                       }
                                       selected={!orderAlbumActive && Number(nb.notebook_id) === Number(selectedNotebookId)}
+                                      selectedBlue
                                       locked={notebookInnerLocked}
                                       editing={
                                         Number(editingNotebookId) === Number(nb.notebook_id) &&
@@ -8319,7 +8323,6 @@ export default function PhotoAlbumsWorkspacePane({
                                             : noteRealLabel
                                       }
                                       selected={!orderAlbumActive && Number(note.note_id) === Number(selectedNoteId)}
-                                      selectedBlue={searchActive}
                                       multiSelected={
                                         !orderAlbumActive && multiSelectedNoteIds.some((id) => Number(id) === Number(note.note_id))
                                       }
@@ -8996,6 +8999,7 @@ export default function PhotoAlbumsWorkspacePane({
                                     shortcut={shortcut}
                                     label={shortcutLabel}
                                     selected={isShortcutSelected(shortcut)}
+                                    selectedBlue={shortcut.target_type === 'notebook'}
                                     locked={shortcutInnerLocked}
                                     draggingId={draggingShortcutId}
                                     dropTargetId={dropTargetShortcutId}
