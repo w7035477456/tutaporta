@@ -32,6 +32,7 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 
 ### Schema changes = migration files (required)
 
+- **Process doc (follow it step by step): `docs/SchemaMigrations/SCHEMA_MIGRATION_PROCESS.md`.**
 - **Every schema change goes in a new file `be/db/migrations/YYYYMMDD_NN_shortName.sql`** (name order = run order; idempotent SQL where possible). Never edit a migration after it has been applied — add a new one.
 - Apply locally with **`dbmigrate`** (`scripts/db-migrate.sh`; `--status` / `--dry-run` change nothing). It records each file in `outdateddbsnapshotoct2024.schema_migrations`, so each runs once per machine.
 - Andrew's flow stays **`work1`** (Mac check-in) → **`work2`** (Ubuntu checkout + deploy). Both handle migrations automatically:
@@ -42,17 +43,9 @@ Do not ask clarifying multiple-choice questions when intent is clear.
 
 ### Mac ↔ Ubuntu schema parity (required)
 
-1. **Every Mac Postgres schema change must also be applied to Ubuntu Postgres** on `192.168.222.200` (DDL, new tables/columns/indexes/enums/functions, migrations in `be/db/*.sql`, etc.). Either:
-   - **Cursor applies it automatically** with **`scripts/ubuntu-psql.sh -f be/db/<migration>.sql`** (or `-c "…"`). It runs `psql` on Ubuntu over the `ssh.mdc` SSH path (`deploy-ssh-mac.sh`: port `59221`, `IdentitiesOnly`, `~/.ssh/xbox2.pem`; never plain `ssh lawsen0@…`) and gets the Ubuntu `test_user1` password from `UBUNTU_POSTGRES_PASSWORD` in the Mac `~/.ssh/be/.env`, **or**
-   - **Cursor gives Andrew the exact `psql` to run on Ubuntu**, wrapped in this marker:
-
-```
-######## DO THIS ON UBUNTU BEGIN ########
-psql -h 127.0.0.1 -p 50010 -U test_user1 -d outdatedDBOct2021 -c "…"
-####### END DO THIS ON UBUNTU #####
-```
-
-2. **If Cursor applied the Ubuntu change itself**, it must then run the Mac alias **`isdbsame`** (`scripts/compare-pg-schema.sh`, after `source ~/b`). The result must be **`same`**, not **`difference`**. If it prints `difference` (or errors), run `isdbsame --verbose`, fix the drift on whichever side is behind, and re-run until it prints `same`. Report the final `isdbsame` result in the reply.
+- **Full process: `docs/SchemaMigrations/SCHEMA_MIGRATION_PROCESS.md` — read and follow it for every schema change.**
+- Ubuntu gets schema changes **only** through migration files applied by **`work2`** — never apply DDL on Ubuntu directly (`scripts/ubuntu-psql.sh`, `ssh xbox0 psql …`): that bypasses `schema_migrations` and causes drift.
+- After Andrew runs `work2`, **`isdbsame`** (Mac) must print **`same`**. On `difference`: `isdbsame --verbose`, fix the side that is behind **with a new migration**, then `work1` → `work2` again.
 
 ## 3) FE + BE on same web server (CORS)
 
