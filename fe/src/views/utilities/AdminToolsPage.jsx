@@ -3,19 +3,13 @@ import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from 'contexts/AuthContext';
 import { isAdminSession } from 'utils/adminSession';
 import { forceAuthLoginRedirect, isAuthFailureMessage } from 'utils/forceAuthLoginRedirect';
-import { themedConfirm } from 'utils/themedDialog';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import ColorTemplate14LandingFrame from 'ui-component/ColorTemplate14LandingFrame';
 import ColorTemplate9TableData from 'ui-component/ColorTemplate9TableData';
-import {
-  adminPhotoStorageFileUrl,
-  fetchAdminPhotoStorageDuplicates,
-  fetchAdminPhotoStorageFiles,
-  removeAdminPhotoStorageDuplicates
-} from 'api/adminToolsFe';
+import { adminPhotoStorageFileUrl, fetchAdminPhotoStorageFiles } from 'api/adminToolsFe';
 import AdminToolsTestTab from './AdminToolsTestTab';
 import AdminToolsStatisticTab from './AdminToolsStatisticTab';
 import AdminToolsPasswordCheckTab from './AdminToolsPasswordCheckTab';
@@ -28,6 +22,7 @@ import AdminToolsRafflesTab from './AdminToolsRafflesTab';
 import AdminToolsScamAlertTab from './AdminToolsScamAlertTab';
 import AdminToolsResticTab from './AdminToolsResticTab';
 import AdminToolsTreeTab from './AdminToolsTreeTab';
+import AdminToolsDuplicateTab from './AdminToolsDuplicateTab';
 import AllSingles from 'views/dashboard/allSingles/AllSingles';
 
 const ADMIN_TOOLS_TABS = [
@@ -188,10 +183,8 @@ export default function AdminToolsPage() {
   const [activeTab, setActiveTab] = useState(() => resolveAdminToolsTab(searchParams.get('tab')) ?? 'statistic');
   const [folder, setFolder] = useState('');
   const [backupFiles, setBackupFiles] = useState([]);
-  const [duplicateGroups, setDuplicateGroups] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [removingChecksum, setRemovingChecksum] = useState('');
 
   const handleToolsError = useCallback((messageOrErr) => {
     if (typeof messageOrErr === 'string' && isAuthFailureMessage(messageOrErr)) {
@@ -228,48 +221,6 @@ export default function AdminToolsPage() {
     }
   }, [handleToolsError]);
 
-  const loadDuplicates = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const data = await fetchAdminPhotoStorageDuplicates();
-      setFolder(String(data?.folder ?? ''));
-      setDuplicateGroups(Array.isArray(data?.groups) ? data.groups : []);
-    } catch (err) {
-      handleToolsError(err);
-      setDuplicateGroups([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [handleToolsError]);
-
-  const handleRemoveDup = useCallback(
-    async (group) => {
-      const checksum = String(group?.checksum ?? '').trim();
-      if (!checksum || !Array.isArray(group?.files) || group.files.length < 2) return;
-      const summary = `${group.sizeLabel ?? ''} — ${group.files.length} copies`;
-      if (
-        !(await themedConfirm(
-          `Remove duplicates for this group (${summary})?\n\nKeeps the lowest photos_id (and its file), repoints profile photos and story posts to it, then deletes the other copies.`
-        ))
-      ) {
-        return;
-      }
-      setRemovingChecksum(checksum);
-      setError('');
-      try {
-        const data = await removeAdminPhotoStorageDuplicates(checksum);
-        setFolder(String(data?.folder ?? folder));
-        setDuplicateGroups(Array.isArray(data?.groups) ? data.groups : []);
-      } catch (err) {
-        handleToolsError(err);
-      } finally {
-        setRemovingChecksum('');
-      }
-    },
-    [folder, handleToolsError]
-  );
-
   const visibleTabs = useMemo(() => ADMIN_TOOLS_TABS, []);
 
   useEffect(() => {
@@ -280,12 +231,8 @@ export default function AdminToolsPage() {
   useEffect(() => {
     if (activeTab === 'backup') {
       void loadBackup();
-    } else if (activeTab === 'duplicate') {
-      void loadDuplicates();
     }
-  }, [activeTab, loadBackup, loadDuplicates]);
-
-  const duplicateFiles = duplicateGroups.flatMap((group) => group.files ?? []);
+  }, [activeTab, loadBackup]);
 
   const adminSession = isAdminSession(user);
   if (authLoading) {
@@ -331,7 +278,7 @@ export default function AdminToolsPage() {
         </ColorTemplate9TableData.TabBar>
         <ColorTemplate9TableData.PanelDivider />
         <ColorTemplate9TableData.Content>
-          {activeTab !== 'test' && activeTab !== 'all-singles' && folder ? (
+          {activeTab === 'backup' && folder ? (
             <ColorTemplate9TableData.BodyText sx={{ mb: 1, wordBreak: 'break-all' }}>Folder: {folder}</ColorTemplate9TableData.BodyText>
           ) : null}
           {error ? (
@@ -360,33 +307,7 @@ export default function AdminToolsPage() {
           {!loading && activeTab === 'asn' ? <AdminToolsAsnTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'tables' ? <AdminToolsTablesTab onError={handleToolsError} /> : null}
           {!loading && activeTab === 'wipe-by-id' ? <AdminToolsWipeByIdTab onError={handleToolsError} /> : null}
-          {!loading && activeTab === 'duplicate' ? (
-            duplicateGroups.length === 0 ? (
-              <ColorTemplate9TableData.EmptyText>
-                No duplicate image files found (same byte size and SHA-256 checksum).
-              </ColorTemplate9TableData.EmptyText>
-            ) : (
-              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                <ColorTemplate9TableData.BodyText>
-                  {duplicateGroups.length} duplicate group(s), {duplicateFiles.length} file(s) total.
-                </ColorTemplate9TableData.BodyText>
-                {duplicateGroups.map((group) => (
-                  <ColorTemplate9TableData.Panel key={group.checksum}>
-                    <ColorTemplate9TableData.GroupTitle>
-                      Same file ({group.sizeLabel}) — {group.files.length} copies
-                    </ColorTemplate9TableData.GroupTitle>
-                    <FileListPanel
-                      files={group.files}
-                      emptyMessage=""
-                      showChecksum
-                      onRemoveDup={() => void handleRemoveDup(group)}
-                      removeDupBusy={removingChecksum === group.checksum}
-                    />
-                  </ColorTemplate9TableData.Panel>
-                ))}
-              </Box>
-            )
-          ) : null}
+          {!loading && activeTab === 'duplicate' ? <AdminToolsDuplicateTab onError={handleToolsError} /> : null}
         </ColorTemplate9TableData.Content>
       </ColorTemplate9TableData.Panel>
     </ColorTemplate14LandingFrame>

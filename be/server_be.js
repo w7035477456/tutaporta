@@ -431,6 +431,7 @@ import {
 import { getAdminStatistics } from './routes/adminStatistics.js';
 import { getAdminResticSnapshots } from './routes/adminRestic.js';
 import { getAdminStorageTree, getAdminStorageTreeFile, getAdminStorageTreeFiles } from './routes/adminStorageTree.js';
+import { getAdminStorageDuplicates, postAdminStorageDuplicatesRemove } from './routes/adminStorageDuplicates.js';
 import {
   getAdminTables,
   postAdminTableCascadeDelete,
@@ -1414,6 +1415,8 @@ app.get('/api/admin/restic/snapshots', requireAuth, requireAdminRole, getAdminRe
 app.get('/api/admin/storage-tree', requireAuth, requireAdminRole, getAdminStorageTree);
 app.get('/api/admin/storage-tree/files', requireAuth, requireAdminRole, getAdminStorageTreeFiles);
 app.get('/api/admin/storage-tree/file', requireAuth, requireAdminRole, getAdminStorageTreeFile);
+app.get('/api/admin/storage-duplicates', requireAuth, requireAdminRole, getAdminStorageDuplicates);
+app.post('/api/admin/storage-duplicates/remove', requireAuth, requireAdminRole, postAdminStorageDuplicatesRemove);
 app.get('/api/admin/tables', requireAuth, requireAdminRole, getAdminTables);
 app.post('/api/admin/tables/:tableKey/truncate', requireAuth, requireAdminRole, postAdminTableTruncate);
 app.post('/api/admin/tables/:tableKey/cascade-delete', requireAuth, requireAdminRole, postAdminTableCascadeDelete);

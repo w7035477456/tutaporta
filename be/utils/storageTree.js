@@ -106,7 +106,7 @@ export function storageFileContentType(name) {
   return 'application/octet-stream';
 }
 
-function storageRootFor(rootKey) {
+export function storageRootFor(rootKey) {
   const envVar = STORAGE_ROOT_ENV[rootKey];
   if (!envVar) {
     const err = new Error('Unknown storage root');

@@ -253,6 +253,19 @@ export async function fetchAdminStorageTreeFileHead(rootKey, relPath, maxBytes =
   return new Uint8Array(data);
 }
 
+/** Admin Tools → Duplicate tab: duplicates under both storage roots' users/ (demo content excluded). */
+export async function fetchAdminStorageDuplicates() {
+  const { data } = await api.get('/api/admin/storage-duplicates');
+  return data;
+}
+
+/** Remove unused copies: pass an array of group sha256, or null for every group. */
+export async function removeAdminStorageDuplicates(sha256List = null) {
+  const body = Array.isArray(sha256List) ? { sha256: sha256List } : { all: true };
+  const { data } = await api.post('/api/admin/storage-duplicates/remove', body);
+  return data;
+}
+
 /** Admin Tools → Raffles tab */
 export async function fetchAdminRaffleLogEvents() {
   const { data } = await api.get('/api/admin/raffle-log/events');
