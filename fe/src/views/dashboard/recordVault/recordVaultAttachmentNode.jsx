@@ -28,6 +28,11 @@ import {
 import { trimSolidImageBorder } from 'utils/trimSolidImageBorder';
 import { openRecordVaultAttachmentInNewWindow } from './openRecordVaultAttachmentWindow';
 import RecordVaultRotateFrame from './RecordVaultRotateFrame';
+import RecordVaultNoteContentZoomBar, {
+  IMAGE_ZOOM_DEFAULT,
+  IMAGE_ZOOM_MAX,
+  IMAGE_ZOOM_MIN
+} from './RecordVaultNoteContentZoomBar';
 import {
   IMAGE_ROTATION_STEP,
   isRotatableAttachmentExtension,
@@ -111,6 +116,13 @@ const actionBtnSx = {
   alignItems: 'center',
   justifyContent: 'center'
 };
+
+/** Per-image zoom % stored on the node (25–200, default 100). */
+function normalizeImageZoom(value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return IMAGE_ZOOM_DEFAULT;
+  return Math.min(IMAGE_ZOOM_MAX, Math.max(IMAGE_ZOOM_MIN, n));
+}
 
 function blobWithMime(blob, mime) {
   if (!mime || blob?.type === mime) return blob;
@@ -437,6 +449,12 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode, updateAttribu
 
   const isViewing = viewingId === attachmentId && viewerLoading;
 
+  // Per-image zoom: slider moves locally while dragging; the note saves it on release.
+  const savedZoom = normalizeImageZoom(node?.attrs?.zoom);
+  const [imageZoom, setImageZoom] = useState(savedZoom);
+  useEffect(() => setImageZoom(savedZoom), [savedZoom]);
+  const showImageZoom = showInlinePreview && viewKind === 'image';
+
   const toolbar = (
     <Box sx={showInlinePreview ? toolbarSx : { display: 'contents' }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -451,6 +469,20 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode, updateAttribu
           </Typography>
         ) : null}
       </Box>
+      {showImageZoom ? (
+        <RecordVaultNoteContentZoomBar
+          value={imageZoom}
+          min={IMAGE_ZOOM_MIN}
+          max={IMAGE_ZOOM_MAX}
+          ariaLabel={`Zoom ${label}`}
+          onChange={setImageZoom}
+          onChangeCommitted={(next) => {
+            if (editable) updateAttributes?.({ zoom: normalizeImageZoom(next) });
+          }}
+          sx={{ flex: '0 0 auto', width: 220 }}
+        />
+      ) : null}
+      <Box sx={showImageZoom ? { ...toolbarSx, flex: 1, minWidth: 0, justifyContent: 'flex-end' } : { display: 'contents' }}>
       {canView ? (
         <SliderControlButton
           type="button"
@@ -511,6 +543,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode, updateAttribu
           {removing ? 'Removing…' : 'Remove'}
         </SliderControlButton>
       ) : null}
+      </Box>
     </Box>
   );
 
@@ -523,7 +556,7 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode, updateAttribu
             sx={{
               width: '100%',
               borderRadius: 1,
-              overflow: showDocumentBody ? 'auto' : 'hidden',
+              overflow: showDocumentBody || (showImageZoom && imageZoom > 100) ? 'auto' : 'hidden',
               bgcolor: showDocumentBody ? '#fff' : '#111',
               border: '1px solid var(--theme-primary-color)',
               minHeight: viewKind === 'pdf' ? INLINE_PDF_HEIGHT : '8rem',
@@ -562,16 +595,22 @@ function RecordVaultAttachmentNodeView({ node, editor, deleteNode, updateAttribu
               />
             ) : null}
             {previewUrl && viewKind === 'image' ? (
-              <RecordVaultRotateFrame
-                src={previewUrl}
-                alt={label}
-                rotation={normalizeImageRotation(node?.attrs?.rotation)}
-                imgSx={{
-                  maxHeight: { xs: '55vh', sm: '70vh' },
-                  bgcolor: '#111'
-                }}
-                frameSx={{ bgcolor: '#111', overflow: 'hidden' }}
-              />
+              // Zoom = width of the frame relative to the row (and the same scale on the height cap).
+              <Box sx={{ width: `${imageZoom}%`, flex: '0 0 auto', mx: 'auto' }}>
+                <RecordVaultRotateFrame
+                  src={previewUrl}
+                  alt={label}
+                  rotation={normalizeImageRotation(node?.attrs?.rotation)}
+                  imgSx={{
+                    maxHeight: {
+                      xs: `calc(55vh * ${imageZoom / 100})`,
+                      sm: `calc(70vh * ${imageZoom / 100})`
+                    },
+                    bgcolor: '#111'
+                  }}
+                  frameSx={{ bgcolor: '#111', overflow: 'hidden' }}
+                />
+              </Box>
             ) : null}
             {showInlineVideoFrame && videoFrameUrl ? (
               <Box
@@ -698,6 +737,15 @@ export const RecordVaultAttachmentNode = Node.create({
         default: 0,
         parseHTML: (el) => parseElementRotation(el),
         renderHTML: (attrs) => rotationToHtmlAttributes(attrs.rotation)
+      },
+      /** Per-image zoom % (25–200) from the slider in the image header; 100 = not saved. */
+      zoom: {
+        default: IMAGE_ZOOM_DEFAULT,
+        parseHTML: (el) => normalizeImageZoom(el.getAttribute('data-zoom') ?? IMAGE_ZOOM_DEFAULT),
+        renderHTML: (attrs) => {
+          const z = normalizeImageZoom(attrs.zoom);
+          return z === IMAGE_ZOOM_DEFAULT ? {} : { 'data-zoom': String(z) };
+        }
       }
     };
   },

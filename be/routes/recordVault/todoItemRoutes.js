@@ -2,6 +2,59 @@ import pool from '../../db/connection.js';
 import { readBillStorageBackend } from '../../utils/billScheduleStorageBackend.js';
 
 export const TODO_LANES = ['repo', 'scheduled', 'done'];
+/** Fixed priority headers: always present (movable, not deletable). */
+export const TODO_HEADERS = ['High', 'Medium', 'Low', 'Has Dependencies'];
+const HEADER_LANE = 'scheduled';
+
+function canonicalHeader(raw) {
+  const s = String(raw ?? '').trim().toLowerCase();
+  return TODO_HEADERS.find((h) => h.toLowerCase() === s) || null;
+}
+
+function normalizeKind(raw) {
+  return raw === 'divider' || raw === 'header' ? raw : 'task';
+}
+
+/**
+ * Create any missing fixed header in Todo Scheduled: High on top,
+ * the others (Medium, Low, Has Dependencies) at the bottom. Runs inside the caller's transaction.
+ */
+async function ensureTodoHeaders(client, singlesId, storageBackend) {
+  const { rows } = await client.query(
+    `SELECT body FROM outdateddbsnapshotoct2024.todo_item
+      WHERE singles_id = $1 AND storage_backend = $2 AND kind = 'header'`,
+    [singlesId, storageBackend]
+  );
+  const have = new Set(rows.map((r) => canonicalHeader(r.body)).filter(Boolean));
+  const missing = TODO_HEADERS.filter((h) => !have.has(h));
+  if (!missing.length) return false;
+  const where = `singles_id = $1 AND storage_backend = $2 AND lane = '${HEADER_LANE}'`;
+  if (missing.includes('High')) {
+    // Shift the lane down by one (two steps so the unique (lane, seq) key never collides).
+    await client.query(`UPDATE outdateddbsnapshotoct2024.todo_item SET seq = seq + 100000 WHERE ${where}`, [
+      singlesId,
+      storageBackend
+    ]);
+    await client.query(`UPDATE outdateddbsnapshotoct2024.todo_item SET seq = seq - 99999 WHERE ${where}`, [
+      singlesId,
+      storageBackend
+    ]);
+    await client.query(
+      `INSERT INTO outdateddbsnapshotoct2024.todo_item (singles_id, storage_backend, kind, lane, seq, body)
+       VALUES ($1, $2, 'header', '${HEADER_LANE}', 1, 'High')`,
+      [singlesId, storageBackend]
+    );
+  }
+  for (const label of missing.filter((h) => h !== 'High')) {
+    await client.query(
+      `INSERT INTO outdateddbsnapshotoct2024.todo_item (singles_id, storage_backend, kind, lane, seq, body)
+       SELECT $1, $2, 'header', '${HEADER_LANE}', COALESCE(MAX(seq), 0) + 1, $3
+         FROM outdateddbsnapshotoct2024.todo_item WHERE ${where}`,
+      [singlesId, storageBackend, label]
+    );
+  }
+  return true;
+}
 const MAX_ITEMS = 2000;
 const MAX_BODY = 4000;
 
@@ -83,7 +136,7 @@ async function listItems(client, singlesId, storageBackend) {
   );
   return rows.map((r) => ({
     todo_item_id: Number(r.todo_item_id),
-    kind: r.kind === 'divider' ? 'divider' : 'task',
+    kind: normalizeKind(r.kind),
     lane: r.lane,
     seq: Number(r.seq),
     body: r.body ?? '',
@@ -101,7 +154,19 @@ export async function getTodoItems(req, res) {
   try {
     const singlesId = requireSinglesId(req);
     const storageBackend = readBillStorageBackend(req);
-    const items = await listItems(pool, singlesId, storageBackend);
+    const client = await pool.connect();
+    let items;
+    try {
+      await client.query('BEGIN');
+      await ensureTodoHeaders(client, singlesId, storageBackend);
+      items = await listItems(client, singlesId, storageBackend);
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
     return res.json({ storage_backend: storageBackend, items });
   } catch (err) {
     return sendError(res, err);
@@ -122,10 +187,35 @@ export async function putTodoItems(req, res) {
     if (incoming.length > MAX_ITEMS) throw httpError(400, `Too many items (max ${MAX_ITEMS})`);
 
     const nextSeq = { repo: 0, scheduled: 0, done: 0 };
-    const normalized = incoming.map((item) => {
+    const seenHeaders = new Set();
+    // Headers: only TODO_HEADERS labels, once each (extras and unknown labels are dropped).
+    const kept = incoming.filter((item) => {
+      if (item?.kind !== 'header') return true;
+      const label = canonicalHeader(item?.body);
+      if (!label || seenHeaders.has(label)) return false;
+      seenHeaders.add(label);
+      return true;
+    });
+    // Headers cannot be deleted: any left out of the save goes back at the end of Todo Scheduled.
+    for (const label of TODO_HEADERS) {
+      if (!seenHeaders.has(label)) kept.push({ kind: 'header', lane: HEADER_LANE, body: label });
+    }
+    const normalized = kept.map((item) => {
       const lane = String(item?.lane ?? '').trim();
       if (!TODO_LANES.includes(lane)) throw httpError(400, `lane must be one of ${TODO_LANES.join(', ')}`);
       nextSeq[lane] += 1;
+      if (item?.kind === 'header') {
+        return {
+          kind: 'header',
+          lane,
+          seq: nextSeq[lane],
+          body: canonicalHeader(item?.body),
+          paid_record_id: null,
+          due_date: null,
+          done_at: null,
+          lane_entered_at: normalizeTimestamp(item?.lane_entered_at)
+        };
+      }
       if (item?.kind === 'divider') {
         // Divider line: position only — no text, paperclip, due date or done time.
         return {

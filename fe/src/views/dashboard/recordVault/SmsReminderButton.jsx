@@ -11,6 +11,15 @@ import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import { deleteSmsReminder, fetchSmsReminder, fetchSmsReminderDefaults, saveSmsReminder } from 'api/smsReminderFe';
 
 const DAY_OPTIONS = [0, 1, 2, 3, 5, 7, 14, 30];
+/** Dropdown entries: one text N days ahead, then "Daily, N days ahead" (a text every morning until due). */
+const SCHEDULE_OPTIONS = [
+  ...DAY_OPTIONS.map((n) => ({ value: `once-${n}`, days: n, daily: false })),
+  ...DAY_OPTIONS.filter((n) => n > 0).map((n) => ({ value: `daily-${n}`, days: n, daily: true }))
+];
+
+function scheduleValue(days, daily) {
+  return `${daily && days > 0 ? 'daily' : 'once'}-${days}`;
+}
 const BLACK = { color: '#000 !important', WebkitTextFillColor: '#000 !important' };
 
 /** 'YYYY-MM-DD' → 'MM/DD/YYYY'. */
@@ -33,9 +42,10 @@ function formatUsPhone(d) {
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 }
 
-function daysLabel(n) {
+function daysLabel(n, daily = false) {
   if (n === 0) return 'On the due date';
-  return n === 1 ? '1 day ahead' : `${n} days ahead`;
+  const ahead = n === 1 ? '1 day ahead' : `${n} days ahead`;
+  return daily ? `Daily, ${ahead}` : ahead;
 }
 
 /** Phone + "SMS" bubble: grey/black when off, yellow/red when a reminder is set. */
@@ -104,6 +114,7 @@ export default function SmsReminderButton({
   const [anchorEl, setAnchorEl] = useState(null);
   const [phone, setPhone] = useState('');
   const [days, setDays] = useState(1);
+  const [daily, setDaily] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
@@ -123,11 +134,13 @@ export default function SmsReminderButton({
         const r = await fetchSmsReminder(reminderId);
         setPhone(usDigits(r.phone));
         setDays(Number(r.days_before ?? 1));
+        setDaily(r.daily === true);
         if (r.last_error) setNote(`Last text failed: ${r.last_error}`);
       } else {
         const d = await fetchSmsReminderDefaults();
         setPhone(usDigits(d.phone));
         setDays(1);
+        setDaily(false);
         if (d.configured === false) setNote('Texting is not set up on this server yet.');
       }
     } catch (err) {
@@ -148,6 +161,7 @@ export default function SmsReminderButton({
         kind,
         phone,
         days_before: days,
+        daily: daily && days > 0,
         label,
         due_date: dueYmd || undefined,
         bill_id: billId || undefined
@@ -263,15 +277,26 @@ export default function SmsReminderButton({
             inputProps={{ inputMode: 'tel', autoComplete: 'tel-national' }}
             sx={fieldSx}
           />
-          <Select size="small" value={days} onChange={(e) => setDays(Number(e.target.value))} disabled={busy} sx={fieldSx}>
-            {DAY_OPTIONS.map((n) => (
-              <MenuItem key={n} value={n}>
-                {daysLabel(n)}
+          <Select
+            size="small"
+            value={scheduleValue(days, daily)}
+            onChange={(e) => {
+              const opt = SCHEDULE_OPTIONS.find((o) => o.value === e.target.value);
+              if (!opt) return;
+              setDays(opt.days);
+              setDaily(opt.daily);
+            }}
+            disabled={busy}
+            sx={fieldSx}
+          >
+            {SCHEDULE_OPTIONS.map((o) => (
+              <MenuItem key={o.value} value={o.value}>
+                {daysLabel(o.days, o.daily)}
               </MenuItem>
             ))}
           </Select>
           <Typography sx={{ fontSize: '0.8rem', color: '#555 !important', WebkitTextFillColor: '#555 !important' }}>
-            Texts at 9am. We send a confirmation text now. Reply STOP to any text to opt out.
+            Texts at 9am{daily && days > 0 ? ' every day until the due date' : ''}. We send a confirmation text now. Reply STOP to any text to opt out.
           </Typography>
           {error ? (
             <Typography sx={{ fontSize: '0.85rem', fontWeight: 700, color: '#c00 !important', WebkitTextFillColor: '#c00 !important' }}>

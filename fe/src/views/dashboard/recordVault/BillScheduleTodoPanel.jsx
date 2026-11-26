@@ -80,7 +80,7 @@ function fromServer(items) {
   );
   return sorted.map((it) => ({
     id: newLocalId(),
-    kind: it.kind === 'divider' ? 'divider' : 'task',
+    kind: it.kind === 'divider' || it.kind === 'header' ? it.kind : 'task',
     lane: it.lane,
     body: it.body ?? '',
     paidRecordId: Number(it.paid_record_id) || null,
@@ -99,7 +99,7 @@ function moveItem(items, id, lane, beforeId) {
   if (!moving) return items;
   const rest = items.filter((it) => it.id !== id);
   // Entering Todo Done stamps the completion time; leaving it clears the time.
-  const doneAt = lane === 'done' && moving.kind !== 'divider' ? (moving.lane === 'done' ? moving.doneAt : new Date().toISOString()) : null;
+  const doneAt = lane === 'done' && moving.kind === 'task' ? (moving.lane === 'done' ? moving.doneAt : new Date().toISOString()) : null;
   // Landing in a different lane restarts its day counter; reordering inside a lane keeps it.
   const laneEnteredAt = moving.lane === lane && moving.laneEnteredAt ? moving.laneEnteredAt : new Date().toISOString();
   const placed = { ...moving, lane, doneAt, laneEnteredAt };
@@ -193,7 +193,7 @@ export default function BillScheduleTodoPanel({
     if (!dirtyRef.current || !loadedStorageRef.current) return saveChainRef.current;
     dirtyRef.current = false;
     const snapshot = itemsRef.current.map((it) => ({
-      kind: it.kind === 'divider' ? 'divider' : 'task',
+      kind: it.kind === 'divider' || it.kind === 'header' ? it.kind : 'task',
       lane: it.lane,
       body: it.body,
       paid_record_id: it.paidRecordId || null,
@@ -298,7 +298,8 @@ export default function BillScheduleTodoPanel({
   const setDueDate = (id, dueDate) => commit((prev) => prev.map((it) => (it.id === id ? { ...it, dueDate } : it)));
   const setSmsReminder = (id, smsReminderId) =>
     commit((prev) => prev.map((it) => (it.id === id ? { ...it, smsReminderId } : it)));
-  const removeItem = (id) => commit((prev) => prev.filter((it) => it.id !== id));
+  // Fixed headers (High / Medium / Low / Has Dependencies) are never removed.
+  const removeItem = (id) => commit((prev) => prev.filter((it) => it.id !== id || it.kind === 'header'));
 
   /** Popup / drop reported the task's Bills/Receipts record — link it (saves when the link is new). */
   const applyReceipt = (itemId, data) => {
@@ -608,11 +609,11 @@ export default function BillScheduleTodoPanel({
       >
         {LANES.map((lane, laneIndex) => {
           const laneItems = items.filter((it) => it.lane === lane.key);
-          const taskCount = laneItems.filter((it) => it.kind !== 'divider').length;
-          // Task numbers skip dividers (1, 2, 3 … across the whole lane).
+          const taskCount = laneItems.filter((it) => it.kind === 'task').length;
+          // Task numbers skip dividers and the fixed headers (1, 2, 3 … across the whole lane).
           const taskNumber = new Map();
           laneItems.forEach((it) => {
-            if (it.kind !== 'divider') taskNumber.set(it.id, taskNumber.size + 1);
+            if (it.kind === 'task') taskNumber.set(it.id, taskNumber.size + 1);
           });
           const isTargetLane = dropTarget?.lane === lane.key;
           return (
@@ -682,6 +683,49 @@ export default function BillScheduleTodoPanel({
                   {laneItems.map((item) => {
                     const index = (taskNumber.get(item.id) || 1) - 1;
                     const before = isTargetLane && dropTarget.beforeId === item.id && dragId !== item.id ? dropLine : null;
+                    if (item.kind === 'header') {
+                      // Fixed header (High / Medium / Low / Has Dependencies): drag to move, no delete.
+                      return (
+                        <Box key={item.id} sx={{ display: 'contents' }}>
+                          {before}
+                          <Box
+                            data-todo-header
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, item.id)}
+                            onDragEnd={endDrag}
+                            onDragOver={(e) => handleCardDragOver(e, lane.key, item.id)}
+                            onDrop={handleDrop}
+                            title={`${item.body} priority header — drag to move`}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              minHeight: 40,
+                              px: 1,
+                              border: '2px solid #000',
+                              borderRadius: 1,
+                              background: `linear-gradient(rgba(0,0,0,0.38), rgba(0,0,0,0.38)), ${lane.headBg}`,
+                              opacity: dragId === item.id ? 0.45 : 1,
+                              cursor: 'grab',
+                              userSelect: 'none',
+                              '&:active': { cursor: 'grabbing' }
+                            }}
+                          >
+                            <Typography
+                              sx={{
+                                fontWeight: 900,
+                                fontSize: '1.6rem',
+                                lineHeight: 1.1,
+                                color: '#000 !important',
+                                WebkitTextFillColor: '#000 !important'
+                              }}
+                            >
+                              {item.body}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    }
                     if (item.kind === 'divider') {
                       return (
                         <Box key={item.id} sx={{ display: 'contents' }}>

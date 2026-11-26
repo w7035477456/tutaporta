@@ -7,15 +7,25 @@ export const NOTE_CONTENT_ZOOM_MIN = 50;
 export const NOTE_CONTENT_ZOOM_MAX = 200;
 export const NOTE_CONTENT_ZOOM_STEP = 5;
 export const NOTE_CONTENT_ZOOM_DEFAULT = 100;
+/** Per-image zoom (vault image header): can shrink further than note text. */
+export const IMAGE_ZOOM_MIN = 25;
+export const IMAGE_ZOOM_MAX = 200;
+export const IMAGE_ZOOM_DEFAULT = 100;
 
 /**
  * Compact yellow slider for the note title row — zooms text and images
  * inside the TipTap note body (TutaNotes).
  */
-export default function RecordVaultNoteContentZoomBar({ value = NOTE_CONTENT_ZOOM_DEFAULT, onChange }) {
-  const zoom = Number.isFinite(value)
-    ? Math.min(NOTE_CONTENT_ZOOM_MAX, Math.max(NOTE_CONTENT_ZOOM_MIN, value))
-    : NOTE_CONTENT_ZOOM_DEFAULT;
+export default function RecordVaultNoteContentZoomBar({
+  value = NOTE_CONTENT_ZOOM_DEFAULT,
+  onChange,
+  onChangeCommitted,
+  min = NOTE_CONTENT_ZOOM_MIN,
+  max = NOTE_CONTENT_ZOOM_MAX,
+  ariaLabel = 'Note content zoom',
+  sx
+}) {
+  const zoom = Number.isFinite(value) ? Math.min(max, Math.max(min, value)) : NOTE_CONTENT_ZOOM_DEFAULT;
 
   return (
     <Box
@@ -32,7 +42,8 @@ export default function RecordVaultNoteContentZoomBar({ value = NOTE_CONTENT_ZOO
         py: 0.35,
         bgcolor: 'var(--theme-yellow-color, #ffd700)',
         border: '2px solid #000',
-        borderRadius: 1
+        borderRadius: 1,
+        ...sx
       }}
     >
       <Typography
@@ -49,13 +60,14 @@ export default function RecordVaultNoteContentZoomBar({ value = NOTE_CONTENT_ZOO
       </Typography>
       <Slider
         value={zoom}
-        min={NOTE_CONTENT_ZOOM_MIN}
-        max={NOTE_CONTENT_ZOOM_MAX}
+        min={min}
+        max={max}
         step={NOTE_CONTENT_ZOOM_STEP}
         onChange={(_e, next) => onChange?.(next)}
+        onChangeCommitted={onChangeCommitted ? (_e, next) => onChangeCommitted(next) : undefined}
         valueLabelDisplay="auto"
         valueLabelFormat={(v) => `${v}%`}
-        aria-label="Note content zoom"
+        aria-label={ariaLabel}
         sx={{
           flex: 1,
           mx: 0.25,
@@ -100,5 +112,11 @@ export default function RecordVaultNoteContentZoomBar({ value = NOTE_CONTENT_ZOO
 
 RecordVaultNoteContentZoomBar.propTypes = {
   value: PropTypes.number,
-  onChange: PropTypes.func
+  onChange: PropTypes.func,
+  /** Fires once when the drag ends (use for saving). */
+  onChangeCommitted: PropTypes.func,
+  min: PropTypes.number,
+  max: PropTypes.number,
+  ariaLabel: PropTypes.string,
+  sx: PropTypes.object
 };

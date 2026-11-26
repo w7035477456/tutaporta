@@ -4,6 +4,7 @@ import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import Typography from '@mui/material/Typography';
 import { SLIDER_CONTROL_TRUE_YELLOW } from 'ui-component/SliderControlButton';
+import ColorTemplate6CloseX from 'ui-component/ColorTemplate6CloseX';
 import { COLOR_TEMPLATE7_POPUP_Z_INDEX } from 'config/colorTemplate7PopupLargeDark';
 import { getPaidRecordAttachmentPreviewKind, paidRecordAttachmentUrl } from 'api/paidRecordFe';
 import BillReceiptAttachmentPreview from './BillReceiptAttachmentPreview';
@@ -34,31 +35,14 @@ const zoomButtonSx = {
   '&:hover:not(:disabled)': { filter: 'brightness(1.08)' }
 };
 
-/** Standard exit chrome: true red (not theme-remapped) with black text + border, so it always reads on the dark backdrop. */
-const EXIT_RED = '#e60000';
-const exitChromeSx = {
-  border: '3px solid #000 !important',
-  borderRadius: 1,
-  bgcolor: `${EXIT_RED} !important`,
-  color: '#000 !important',
-  WebkitTextFillColor: '#000 !important',
-  fontWeight: 900,
-  lineHeight: 1,
-  cursor: 'pointer',
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  boxShadow: '0 0 0 2px #fff',
-  '&:hover': { filter: 'brightness(1.1)' }
-};
-
 function clampZoom(z) {
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z));
 }
 
 /**
- * Full-screen Bills/Receipts viewer. Images open fitted to the window, then − / + (or the mouse
- * wheel) zoom and click-drag pans. PDF / DOCX fall back to the fitted preview.
+ * Bills/Receipts zoom popup (large centered window with the standard top-right red X; Esc or a
+ * click outside also closes). Images open fitted to the window, then − / + (or the mouse wheel)
+ * zoom and click-drag pans. PDF / DOCX fall back to the fitted preview.
  */
 export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, attachment }) {
   const stageRef = useRef(null);
@@ -150,14 +134,28 @@ export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, att
 
   return (
     <Dialog
-      fullScreen
       open={open}
       onClose={onClose}
+      maxWidth={false}
       aria-label="Zoomed bill or receipt"
       sx={{ zIndex: COLOR_TEMPLATE7_POPUP_Z_INDEX + 100 }}
-      PaperProps={{ sx: { bgcolor: 'rgba(0, 0, 0, 0.88)', backgroundImage: 'none', overflow: 'hidden' } }}
+      PaperProps={{
+        sx: {
+          position: 'relative',
+          width: '94vw',
+          height: '92vh',
+          maxWidth: 'none',
+          maxHeight: 'none',
+          m: 0,
+          bgcolor: '#d9d9d9',
+          backgroundImage: 'none',
+          border: '3px solid #000',
+          borderRadius: 2,
+          overflow: 'hidden'
+        }
+      }}
     >
-      <Box sx={{ position: 'relative', width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ position: 'relative', width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
         <Box
           sx={{
             flex: `0 0 ${TOOLBAR_PX}px`,
@@ -167,20 +165,23 @@ export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, att
             alignItems: 'center',
             justifyContent: 'center',
             gap: 1.5,
-            bgcolor: '#000'
+            px: 8
           }}
         >
-          {/* Top middle: obvious Exit (Esc also closes). */}
-          <Box
-            component="button"
-            type="button"
-            onClick={onClose}
-            aria-label="Exit zoom"
-            title="Exit zoom (Esc)"
-            sx={{ ...exitChromeSx, height: 48, px: 3, fontSize: '1.6rem' }}
+          <Typography
+            sx={{
+              fontWeight: 800,
+              fontSize: '1.4rem',
+              color: '#000',
+              WebkitTextFillColor: '#000',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              maxWidth: '50%'
+            }}
           >
-            Exit
-          </Box>
+            {attachment?.originalFileName || 'Zoom'}
+          </Typography>
           {isImage ? (
             <Box
               sx={{
@@ -206,15 +207,15 @@ export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, att
               <Typography
                 component="button"
                 type="button"
-                title="Fit to page"
+                title="Fit to window"
                 onClick={resetZoom}
                 sx={{
                   minWidth: 72,
                   bgcolor: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
-                  color: '#fff',
-                  WebkitTextFillColor: '#fff',
+                  color: '#000',
+                  WebkitTextFillColor: '#000',
                   fontWeight: 800,
                   fontSize: '1.1rem'
                 }}
@@ -233,17 +234,13 @@ export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, att
               </Box>
             </Box>
           ) : null}
-          {/* Top right: standard red box with black X. */}
-          <Box
-            component="button"
-            type="button"
-            onClick={onClose}
+          {/* Top right: the standard popup close X. */}
+          <ColorTemplate6CloseX
+            onClose={onClose}
             aria-label="Close zoom"
-            title="Close (Esc)"
-            sx={{ ...exitChromeSx, position: 'absolute', top: 8, right: 16, width: 48, height: 48, p: 0, fontSize: '1.8rem' }}
-          >
-            X
-          </Box>
+            title="Close"
+            positionSx={{ position: 'absolute', top: 8, right: 12 }}
+          />
         </Box>
         <Box
           ref={measureStage}
@@ -256,6 +253,10 @@ export default function BillReceiptZoomViewer({ open, onClose, paidRecordId, att
             position: 'relative',
             flex: 1,
             minHeight: 0,
+            mx: 1.5,
+            mb: 1.5,
+            borderRadius: 1,
+            bgcolor: 'rgba(0, 0, 0, 0.85)',
             overflow: 'hidden',
             cursor: isImage ? (dragging ? 'grabbing' : 'grab') : 'default',
             touchAction: 'none',

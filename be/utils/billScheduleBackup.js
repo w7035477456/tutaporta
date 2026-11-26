@@ -7,6 +7,7 @@
  *   bill_receipts/{id}/{file}   receipt files (same relative_path as in Postgres)
  * Only the Cloud side (storage_backend 'tutaCloud') is backed up / restored.
  */
+import { TODO_HEADERS } from '../routes/recordVault/todoItemRoutes.js';
 import fs from 'fs';
 import path from 'path';
 import pool, { getDBSchema } from '../db/connection.js';
@@ -512,7 +513,9 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
     for (const r of todoSorted) {
       const lane = String(r.lane);
       nextSeq[lane] += 1;
-      const isDivider = r?.kind === 'divider';
+      // Dividers and fixed headers (High / Medium / Low / Has Dependencies): position (+ header label) only.
+      const isHeader = r?.kind === 'header' && TODO_HEADERS.includes(String(r?.body ?? '').trim());
+      const isDivider = r?.kind === 'divider' || isHeader;
       const oldPaidId = isDivider ? null : toIntOrNull(r?.paid_record_id);
       const newPaidId = oldPaidId && kindByOldId.get(oldPaidId) === 'todo' ? newIdByOldId.get(oldPaidId) ?? null : null;
       const dueDate = /^\d{4}-\d{2}-\d{2}$/.test(String(r?.due_date ?? '')) ? String(r.due_date) : null;
@@ -523,10 +526,10 @@ export async function restoreBillScheduleFromBackup(singlesId, extractDir, notes
         [
           singlesId,
           CLOUD_BACKEND,
-          isDivider ? 'divider' : 'task',
+          isHeader ? 'header' : isDivider ? 'divider' : 'task',
           lane,
           nextSeq[lane],
-          isDivider ? '' : String(r?.body ?? '').slice(0, 4000),
+          isHeader ? String(r.body).trim() : isDivider ? '' : String(r?.body ?? '').slice(0, 4000),
           newPaidId,
           isDivider ? null : dueDate,
           !isDivider && lane === 'done' ? r?.done_at ?? null : null,

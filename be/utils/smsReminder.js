@@ -6,6 +6,8 @@
  *   send day (due date − days_before) is today or already passed while the due date has not.
  *   last_sent_due_date stops a second text for the same due date (also across restarts and
  *   PM2 cluster workers: the claim is one atomic UPDATE).
+ * - daily = true ("Daily, N days ahead"): one text every day of that window instead of one in
+ *   total; last_sent_on stops a second text on the same day.
  * - Skipped: soft-deleted rows, Paid / Paid Off bills, tasks in Todo Done.
  * - Texts are plain ASCII (GSM-7) and kept under 160 characters = 1 Twilio segment.
  *
@@ -49,6 +51,8 @@ export async function initSmsReminderSchema() {
     CREATE INDEX IF NOT EXISTS monthly_bill_sms_reminder_idx ON ${S}.monthly_bill (sms_reminder_id) WHERE sms_reminder_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS yearly_bill_sms_reminder_idx  ON ${S}.yearly_bill  (sms_reminder_id) WHERE sms_reminder_id IS NOT NULL;
     CREATE INDEX IF NOT EXISTS todo_item_sms_reminder_idx    ON ${S}.todo_item    (sms_reminder_id) WHERE sms_reminder_id IS NOT NULL;
+    ALTER TABLE ${S}.sms_reminder ADD COLUMN IF NOT EXISTS daily boolean NOT NULL DEFAULT false;
+    ALTER TABLE ${S}.sms_reminder ADD COLUMN IF NOT EXISTS last_sent_on date NULL;
   `);
 }
 
@@ -76,22 +80,26 @@ export function formatUsDate(ymd) {
   return m ? `${m[2]}/${m[3]}/${m[1]}` : '';
 }
 
-function daysPhrase(days) {
+function daysPhrase(days, daily = false) {
   const n = Number(days) || 0;
   if (n === 0) return 'on the due date';
+  if (daily) return n === 1 ? 'daily from 1 day before' : `daily from ${n} days before`;
   return n === 1 ? '1 day before' : `${n} days before`;
 }
 
 /** Sent right after the user saves the popup. */
-export function buildConfirmText({ label, dueYmd, daysBefore }) {
+export function buildConfirmText({ label, dueYmd, daysBefore, daily = false }) {
   const due = formatUsDate(dueYmd);
   const what = due ? `${shortLabel(label)} due ${due}` : shortLabel(label);
-  return `TutaNotes: Reminder set for ${what}. We'll text you ${daysPhrase(daysBefore)}. ${SMS_OPT_OUT}`;
+  return `TutaNotes: Reminder set for ${what}. We'll text you ${daysPhrase(daysBefore, daily)}. ${SMS_OPT_OUT}`;
 }
 
-/** Sent at 9am on the reminder day. */
-export function buildReminderText({ label, dueYmd }) {
-  return `TutaNotes reminder: ${shortLabel(label)} is due ${formatUsDate(dueYmd)}. ${SMS_OPT_OUT}`;
+/** Sent at 9am on the reminder day (daily reminders also say how many days are left). */
+export function buildReminderText({ label, dueYmd, daysLeft = null }) {
+  let when = `is due ${formatUsDate(dueYmd)}`;
+  if (daysLeft === 0) when = `is due today ${formatUsDate(dueYmd)}`;
+  else if (daysLeft > 0) when += ` (${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left)`;
+  return `TutaNotes reminder: ${shortLabel(label)} ${when}. ${SMS_OPT_OUT}`;
 }
 
 // ---------- dates ----------
@@ -196,7 +204,7 @@ export function getSmsReminderAtHour() {
 async function loadCandidates(client) {
   // One connection → run the three queries one after another (pg does not queue them in parallel).
   const monthly = await client.query(
-      `SELECT r.sms_reminder_id, r.phone, r.days_before, r.last_sent_due_date,
+      `SELECT r.sms_reminder_id, r.phone, r.days_before, r.daily, r.last_sent_due_date,
               mb.bill_year, mb.bill_month, mb.due_day, mb.bill_description AS label
          FROM ${S}.sms_reminder r
          JOIN ${S}.monthly_bill mb ON mb.sms_reminder_id = r.sms_reminder_id AND mb.singles_id = r.singles_id
@@ -204,7 +212,7 @@ async function loadCandidates(client) {
           AND mb.action IS DISTINCT FROM 'Paid' AND mb.bill_type IS DISTINCT FROM 'Paid Off'`
   );
   const yearly = await client.query(
-      `SELECT r.sms_reminder_id, r.phone, r.days_before, r.last_sent_due_date,
+      `SELECT r.sms_reminder_id, r.phone, r.days_before, r.daily, r.last_sent_due_date,
               yb.bill_year, yb.bill_month, yb.due_month_day, yb.due_year, yb.bill_period,
               yb.bill_description AS label
          FROM ${S}.sms_reminder r
@@ -213,7 +221,7 @@ async function loadCandidates(client) {
           AND yb.action IS DISTINCT FROM 'Paid'`
   );
   const todo = await client.query(
-      `SELECT r.sms_reminder_id, r.phone, r.days_before, r.last_sent_due_date,
+      `SELECT r.sms_reminder_id, r.phone, r.days_before, r.daily, r.last_sent_due_date,
               to_char(t.due_date, 'YYYY-MM-DD') AS due_date, t.body AS label
          FROM ${S}.sms_reminder r
          JOIN ${S}.todo_item t ON t.sms_reminder_id = r.sms_reminder_id AND t.singles_id = r.singles_id
@@ -237,17 +245,23 @@ export async function runSmsReminders(now = nowInReminderTz()) {
       const due = dueDateToRemind(kind, row, row.days_before, now);
       if (!due) continue;
       const dueYmd = ymd(due);
-      // Atomic claim: only one worker / run texts this due date.
+      const todayYmd = ymd(now);
+      const daily = row.daily === true;
+      // Atomic claim: only one worker / run texts this due date (daily: this day).
       const { rowCount } = await client.query(
         `UPDATE ${S}.sms_reminder
-            SET last_sent_due_date = $2::date, last_sent_at = now(), last_error = NULL, updated_at = now()
+            SET last_sent_due_date = $2::date, last_sent_on = $3::date, last_sent_at = now(),
+                last_error = NULL, updated_at = now()
           WHERE sms_reminder_id = $1
-            AND last_sent_due_date IS DISTINCT FROM $2::date`,
-        [row.sms_reminder_id, dueYmd]
+            AND CASE WHEN $4 THEN last_sent_on IS DISTINCT FROM $3::date
+                     ELSE last_sent_due_date IS DISTINCT FROM $2::date END`,
+        [row.sms_reminder_id, dueYmd, todayYmd, daily]
       );
       if (!rowCount) continue;
+      const today0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const daysLeft = daily ? Math.round((due.getTime() - today0.getTime()) / 86400000) : null;
       try {
-        await sendTwilioSms(row.phone, buildReminderText({ label: row.label, dueYmd }));
+        await sendTwilioSms(row.phone, buildReminderText({ label: row.label, dueYmd, daysLeft }));
         sent += 1;
       } catch (err) {
         failed += 1;
@@ -257,6 +271,7 @@ export async function runSmsReminders(now = nowInReminderTz()) {
           `UPDATE ${S}.sms_reminder
               SET last_error = $2,
                   last_sent_due_date = CASE WHEN $3 THEN last_sent_due_date ELSE NULL END,
+                  last_sent_on = CASE WHEN $3 THEN last_sent_on ELSE NULL END,
                   updated_at = now()
             WHERE sms_reminder_id = $1`,
           [row.sms_reminder_id, String(err?.message || err).slice(0, 500), optedOut]

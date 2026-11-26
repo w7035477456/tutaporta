@@ -2,9 +2,10 @@
  * SMS reminder popup API (Bill Schedule Monthly / Yearly rows and ToDo tasks).
  *
  * GET    /api/smsReminder/defaults      → { phone }   last phone used, else the member's phone
- * GET    /api/smsReminder/:id           → { sms_reminder_id, phone, days_before }
+ * GET    /api/smsReminder/:id           → { sms_reminder_id, phone, days_before, daily }
  * POST   /api/smsReminder               → create / update, texts a confirmation right away
- *        body { sms_reminder_id?, kind, phone, days_before, label, due_date?, bill_id? }
+ *        body { sms_reminder_id?, kind, phone, days_before, daily?, label, due_date?, bill_id? }
+ *        daily = true → text every morning from days_before through the due date.
  *        bill_id (monthly_bill_id / yearly_bill_id) links the saved row now, so the icon
  *        stays on even before the user presses SAVE.
  * DELETE /api/smsReminder/:id           → turn off (unlinks bill / todo rows)
@@ -89,7 +90,7 @@ export async function getSmsReminder(req, res) {
     const id = toId(req.params?.id);
     if (!id) throw httpError(400, 'Bad reminder id');
     const { rows } = await pool.query(
-      `SELECT sms_reminder_id, kind, phone, days_before,
+      `SELECT sms_reminder_id, kind, phone, days_before, daily,
               to_char(last_sent_due_date, 'YYYY-MM-DD') AS last_sent_due_date, last_error
          FROM ${S}.sms_reminder WHERE sms_reminder_id = $1 AND singles_id = $2`,
       [id, singlesId]
@@ -113,6 +114,8 @@ export async function postSmsReminder(req, res) {
     if (!Number.isFinite(daysBefore) || daysBefore < 0 || daysBefore > 30) {
       throw httpError(400, 'Days ahead must be 0 to 30');
     }
+    // "Daily" with 0 days ahead is just "On the due date".
+    const daily = body.daily === true && daysBefore > 0;
     const existingId = toId(body.sms_reminder_id);
     const billId = toId(body.bill_id);
 
@@ -123,26 +126,29 @@ export async function postSmsReminder(req, res) {
       await client.query('BEGIN');
       if (existingId) {
         const { rows: prev } = await client.query(
-          `SELECT phone FROM ${S}.sms_reminder WHERE sms_reminder_id = $1 AND singles_id = $2 FOR UPDATE`,
+          `SELECT phone, days_before, daily FROM ${S}.sms_reminder WHERE sms_reminder_id = $1 AND singles_id = $2 FOR UPDATE`,
           [existingId, singlesId]
         );
         if (!prev[0]) throw httpError(404, 'Reminder not found');
-        phoneChanged = prev[0].phone !== phone;
+        // Confirm again when the number or the schedule changed.
+        phoneChanged =
+          prev[0].phone !== phone || Number(prev[0].days_before) !== daysBefore || Boolean(prev[0].daily) !== daily;
         // New phone or new lead time: allow the next due date to be texted again.
         await client.query(
           `UPDATE ${S}.sms_reminder
-              SET phone = $3, days_before = $4, kind = $5, last_error = NULL,
-                  last_sent_due_date = CASE WHEN phone = $3 AND days_before = $4 THEN last_sent_due_date ELSE NULL END,
+              SET phone = $3, days_before = $4, kind = $5, daily = $6, last_error = NULL,
+                  last_sent_due_date = CASE WHEN phone = $3 AND days_before = $4 AND daily = $6
+                                            THEN last_sent_due_date ELSE NULL END,
                   updated_at = now()
             WHERE sms_reminder_id = $1 AND singles_id = $2`,
-          [existingId, singlesId, phone, daysBefore, kind]
+          [existingId, singlesId, phone, daysBefore, kind, daily]
         );
         reminderId = existingId;
       } else {
         const { rows: created } = await client.query(
-          `INSERT INTO ${S}.sms_reminder (singles_id, kind, phone, days_before)
-           VALUES ($1, $2, $3, $4) RETURNING sms_reminder_id`,
-          [singlesId, kind, phone, daysBefore]
+          `INSERT INTO ${S}.sms_reminder (singles_id, kind, phone, days_before, daily)
+           VALUES ($1, $2, $3, $4, $5) RETURNING sms_reminder_id`,
+          [singlesId, kind, phone, daysBefore, daily]
         );
         reminderId = Number(created[0].sms_reminder_id);
       }
@@ -171,7 +177,7 @@ export async function postSmsReminder(req, res) {
         try {
           await sendTwilioSms(
             phone,
-            buildConfirmText({ label: body.label, dueYmd: body.due_date, daysBefore })
+            buildConfirmText({ label: body.label, dueYmd: body.due_date, daysBefore, daily })
           );
           confirmationSent = true;
         } catch (err) {

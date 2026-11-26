@@ -90,7 +90,7 @@ import {
   isBillYearlyNoteId,
   isSelectableNoteId
 } from './billScheduleConstants';
-import RecordVaultNoteContentZoomBar, { NOTE_CONTENT_ZOOM_DEFAULT } from './RecordVaultNoteContentZoomBar';
+import { NOTE_CONTENT_ZOOM_DEFAULT } from './RecordVaultNoteContentZoomBar';
 import RecordVaultImageRotateButton from './RecordVaultImageRotateButton';
 import RecordVaultNoteAttachButton from './RecordVaultNoteAttachButton';
 import VaultWorkspaceFocusToggleButton from 'ui-component/VaultWorkspaceFocusToggleButton';
@@ -1223,7 +1223,7 @@ function MenuRowButton({
 }) {
   const useDivDragSurface = Boolean(draggable);
   const lookSelected = selected || multiSelected;
-  // Search hit on the open note: blue. Otherwise current notebook/note/Monthly/Yearly: green.
+  // Selected notebook (list + Shortcut): blue (selectedBlue). Selected note / Monthly / Yearly: green.
   const searchHitBlue = Boolean(lookSelected && !locked && selectedBlue && selected);
   const currentGreen = Boolean(lookSelected && !locked && !searchHitBlue);
   const rowClass = locked ? undefined : currentGreen ? MENU_ROW_CURRENT_CLASS : searchHitBlue ? undefined : MENU_ROW_IDLE_CLASS;
@@ -1285,6 +1285,7 @@ function ShortcutMenuRow({
   shortcut,
   label,
   selected,
+  selectedBlue = false,
   locked = false,
   draggingId,
   dropTargetId,
@@ -1317,6 +1318,7 @@ function ShortcutMenuRow({
       <Box data-menu-label-slot="" sx={{ width: '100%', minWidth: 0, display: 'flex', justifyContent: 'center' }}>
         <MenuRowButton
           selected={selected}
+          selectedBlue={selectedBlue}
           locked={locked}
           draggable={!disabled}
           title={locked ? 'Locked — enter PIN to open' : 'Drag to reorder; click to open'}
@@ -1799,7 +1801,8 @@ export default function RecordVaultWorkspacePane({
   const multiSelectedNoteIdsRef = useRef([]);
   const noteMultiSelectAnchorIdRef = useRef(null);
   const [openNoteTitlePlain, setOpenNoteTitlePlain] = useState('');
-  const [noteContentZoom, setNoteContentZoom] = useState(NOTE_CONTENT_ZOOM_DEFAULT);
+  /** Note text zoom is fixed at 100%; each vault image has its own Zoom slider in its header. */
+  const noteContentZoom = NOTE_CONTENT_ZOOM_DEFAULT;
   /** Zoom icon — hide sidebars/menus and show note only (red letterbox shell). */
   const [noteFocusView, setNoteFocusView] = useState(false);
   const hideWorkspaceChrome = noteFocusView;
@@ -2143,9 +2146,9 @@ export default function RecordVaultWorkspacePane({
   const titleHighlightClass = !searchActive && noteSearchActiveTerms.length > 0 ? 'rv-note-search-hit' : 'rv-search-hit';
 
   // Search never prunes the tree: every notebook (and every note) stays visible on
-  // the left. A match is shown by selection styling — containing notebook stays green
-  // (current) and the matched note goes blue (selectedBlue) — so the user keeps their
-  // full notebook list while jumping between hits.
+  // the left. A match is shown by selection styling — containing notebook blue, matched
+  // note green (same colors as any selection) — so the user keeps their full notebook
+  // list while jumping between hits.
   // Bill Schedule lives in a separate bottom box (not in displayNotebooks).
 
   const loadNoteContent = useCallback(
@@ -8083,6 +8086,7 @@ export default function RecordVaultWorkspacePane({
                                                 : undefined
                                         }
                                         selected={Number(nb.notebook_id) === Number(selectedNotebookId)}
+                                        selectedBlue
                                         locked={notebookInnerLocked}
                                         editing={
                                           Number(editingNotebookId) === Number(nb.notebook_id) &&
@@ -8294,7 +8298,6 @@ export default function RecordVaultWorkspacePane({
                                                 : noteRealLabel
                                           }
                                           selected={Number(note.note_id) === Number(selectedNoteId)}
-                                          selectedBlue={searchActive}
                                           multiSelected={multiSelectedNoteIds.some((id) => Number(id) === Number(note.note_id))}
                                           locked={noteInnerLocked}
                                           editing={menuEditingThisNote && !noteInnerLocked}
@@ -8554,9 +8557,8 @@ export default function RecordVaultWorkspacePane({
                                           onNextHit={() => goToNoteSearchHit(1)}
                                           sx={{ ml: 0.5 }}
                                         />
-                                        {/* Zoom + expand pinned flush right on row 1. */}
+                                        {/* Expand pinned flush right on row 1 (Zoom now lives on each image header). */}
                                         <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 1, flex: '0 0 auto' }}>
-                                          <RecordVaultNoteContentZoomBar value={noteContentZoom} onChange={setNoteContentZoom} />
                                           <VaultWorkspaceFocusToggleButton
                                             active={noteFocusView}
                                             onToggle={() => setNoteFocusView((v) => !v)}
@@ -8888,6 +8890,7 @@ export default function RecordVaultWorkspacePane({
                                     shortcut={shortcut}
                                     label={shortcutLabel}
                                     selected={isShortcutSelected(shortcut)}
+                                    selectedBlue={shortcut.target_type === 'notebook'}
                                     locked={shortcutInnerLocked}
                                     draggingId={draggingShortcutId}
                                     dropTargetId={dropTargetShortcutId}
