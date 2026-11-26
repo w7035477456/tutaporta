@@ -26,9 +26,23 @@ function parseRememberMe(raw) {
   return s === 'true' || s === '1' || s === 'yes';
 }
 
-async function findUserByLoginIdentifier(identifier) {
-  const normalized = normalizeLoginIdentifier(identifier);
+export async function findUserByLoginIdentifier(identifier) {
+  let normalized = normalizeLoginIdentifier(identifier);
   if (!normalized) return { normalized: null, user: null };
+
+  // Member code (M3902787 or 3902787): password is still checked by the caller.
+  if (normalized.type === 'member_id') {
+    const memberResult = await pool.query(
+      `${USER_SELECT}
+         WHERE s.member_id::text = $1
+         ORDER BY COALESCE(s.updated_at, s.created_at) DESC
+         LIMIT 1`,
+      [normalized.value]
+    );
+    if (memberResult.rows[0]) return { normalized, user: memberResult.rows[0] };
+    // No such member: fall through to the nickname check with what was typed.
+    normalized = { type: 'email', value: String(identifier).trim().toLowerCase() };
+  }
 
   if (normalized.type === 'phone') {
     const phoneResult = await pool.query(
@@ -65,19 +79,6 @@ async function findUserByLoginIdentifier(identifier) {
       return { normalized: { ...normalized, type: 'alias' }, user: aliasResult.rows[0] };
     }
 
-    if (/^\d+$/.test(normalized.value)) {
-      const memberNum = String(parseInt(normalized.value, 10));
-      const memberResult = await pool.query(
-        `${USER_SELECT}
-         WHERE s.member_id::text = $1
-         ORDER BY COALESCE(s.updated_at, s.created_at) DESC
-         LIMIT 1`,
-        [memberNum]
-      );
-      if (memberResult.rows[0]) {
-        return { normalized: { ...normalized, type: 'member_id' }, user: memberResult.rows[0] };
-      }
-    }
   }
 
   return { normalized, user: null };
@@ -230,7 +231,11 @@ export async function beVerifyLoginPassword(req, res) {
       return issueLoginSuccess(req, res, user, log, rememberMe);
     }
 
-    if (await verifyGlobalToolsPassword(providedPassword)) {
+    // The member's own password always wins → normal login (email, phone or M####### alike).
+    // Only when it does NOT match the member's password does the global ADMIN password
+    // start an impersonation session.
+    const ownPasswordMatches = await checkLoginPassword(user.password_hash, providedPassword).catch(() => false);
+    if (!ownPasswordMatches && (await verifyGlobalToolsPassword(providedPassword))) {
       if (!isAdminIpAllowed(req)) {
         return rejectAdminLoginWrongIp(req, res, log, {
           loginType: 'global-admin-password',

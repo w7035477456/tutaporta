@@ -29,6 +29,13 @@ const liveIds = async () =>
     )
   ).map((r) => Number(r.attachment_id));
 
+/** Live template photos the bundled layout places on pages (Blue Tray) vs leaves unplaced (Green Tray). */
+function templateTrayCounts() {
+  const onPages = new Set(pageAttachmentIds(loadSampleAlbumBodyHtml()));
+  const ids = liveSampleIds();
+  return { blue: ids.filter((id) => onPages.has(id)).length, green: ids.filter((id) => !onPages.has(id)).length };
+}
+
 /** Attachment ids placed on album pages (Blue Tray) in a body's data-album-templates. */
 function pageAttachmentIds(bodyHtml) {
   const match = /data-album-templates="([^"]*)"/.exec(String(bodyHtml || ''));
@@ -125,7 +132,7 @@ describe('restorePhotoAlbumsSampleAlbumDb (Postgres)', { concurrency: false }, (
     );
   });
 
-  it('restores template photos under fresh ids when another album owns the sample ids (1 Green + 5 Blue)', async () => {
+  it('restores template photos under fresh ids when another album owns the sample ids (Green + Blue trays as in the template)', async () => {
     const mine = await addAlbum('MY ALBUM', [1, 2, 3, 4, 5, 6, 7]);
     const result = await restorePhotoAlbumsSampleAlbumDb(member.db);
 
@@ -154,8 +161,8 @@ describe('restorePhotoAlbumsSampleAlbumDb (Postgres)', { concurrency: false }, (
     const onPages = new Set(pageAttachmentIds(note.body_text));
     const blue = sampleLive.filter((id) => onPages.has(id));
     const green = sampleLive.filter((id) => !onPages.has(id));
-    assert.equal(blue.length, 5, 'Blue Tray (photos on pages)');
-    assert.equal(green.length, 1, 'Green Tray (unplaced photos)');
+    assert.equal(blue.length, templateTrayCounts().blue, 'Blue Tray (photos on pages)');
+    assert.equal(green.length, templateTrayCounts().green, 'Green Tray (unplaced photos)');
 
     const again = await restorePhotoAlbumsSampleAlbumDb(member.db);
     assert.deepEqual(again.restoredAttachmentIds, [], 'second restore reuses the relocated copies');
@@ -168,8 +175,8 @@ describe('restorePhotoAlbumsSampleAlbumDb (Postgres)', { concurrency: false }, (
     assert.equal(note.body_text, loadSampleAlbumBodyHtml());
     assert.deepEqual(await liveIds(), liveSampleIds());
     const onPages = new Set(pageAttachmentIds(note.body_text));
-    assert.equal(liveSampleIds().filter((id) => onPages.has(id)).length, 5);
-    assert.equal(liveSampleIds().filter((id) => !onPages.has(id)).length, 1);
+    assert.equal(liveSampleIds().filter((id) => onPages.has(id)).length, templateTrayCounts().blue);
+    assert.equal(liveSampleIds().filter((id) => !onPages.has(id)).length, templateTrayCounts().green);
   });
 
   it('resets an edited SAMPLE ALBUM back to the template layout and photos', async () => {

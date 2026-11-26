@@ -36,3 +36,14 @@ test('bundled new-member sample album has no hint labels', () => {
   assert.ok(!html.includes('tl_sample_hint_'));
   assert.ok(!html.includes('Double me to edit photo'));
 });
+
+test('stripSampleAlbumHintText also drops plain-text hint leftovers, keeps other text', async () => {
+  const { stripSampleAlbumHintText } = await import('./migrateSampleAlbumTutorialLabels.js');
+  const layout = '<div data-rv-album-template="" style="display:none"></div><p></p>';
+  const body =
+    layout +
+    '<p>Double me to edit photo</p><p></p><p>You can add/play Video (mp4) files on Album also</p><p></p>' +
+    '<p>My own caption</p>' +
+    hint('tl_sample_hint_edit_1', 'Double me to edit photo');
+  assert.equal(stripSampleAlbumHintText(body), layout + '<p>My own caption</p>');
+});

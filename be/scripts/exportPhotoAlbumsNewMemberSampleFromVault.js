@@ -16,6 +16,7 @@ import pool from '../db/connection.js';
 import { DEFAULT_SAMPLE_ALBUM_NAME } from '../utils/photoAlbumsUsb/vaultSchema.js';
 import { PHOTO_ALBUMS_VAULT_TABLES as T, VaultPgDb } from '../utils/photoAlbumsUsb/vaultPgStore.js';
 import { remapSampleAlbumBodyAttachmentIds } from '../utils/photoAlbumsNewMemberSample/seedPhotoAlbumsNewMemberSample.js';
+import { stripSampleAlbumHintText } from '../utils/photoAlbumsNewMemberSample/migrateSampleAlbumTutorialLabels.js';
 import {
   INITIALIZE_SAMPLE_ASSET_ROOT,
   loadInitializeSampleManifest
@@ -90,9 +91,9 @@ async function main() {
   };
 
   const remap = new Map([...vaultToManifest].filter(([vaultId, manifestId]) => vaultId !== manifestId));
-  const bodyText = remap.size
-    ? remapSampleAlbumBodyAttachmentIds(String(note.body_text || ''), remap)
-    : String(note.body_text || '');
+  // Drop invisible leftovers of the retired hint labels ("Double me to edit photo", video hint).
+  const source = stripSampleAlbumHintText(String(note.body_text || ''));
+  const bodyText = remap.size ? remapSampleAlbumBodyAttachmentIds(source, remap) : source;
 
   const bodyFile = manifest.bodyHtmlFile || 'sampleAlbumBody.html';
   fs.writeFileSync(path.join(INITIALIZE_SAMPLE_ASSET_ROOT, bodyFile), bodyText, 'utf8');
@@ -112,4 +113,5 @@ main()
     console.error(err?.message || err);
     process.exitCode = 1;
   })
-  .finally(() => pool.end());
+  // loadEnv keeps a timer alive: exit explicitly once the pool is closed.
+  .finally(() => pool.end().finally(() => process.exit(process.exitCode ?? 0)));

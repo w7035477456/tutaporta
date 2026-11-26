@@ -404,7 +404,7 @@ export default function AuthLogin() {
         <Box sx={fieldWithRightImageInputColSx}>
           <ColorTemplate16InputTemplate
             id={LOGIN_EMAIL_INPUT_ID}
-            label="Email or Phone"
+            label="Email, Phone or Member #"
             type="text"
             value={email}
             onChange={handleEmailChange}
@@ -414,7 +414,7 @@ export default function AuthLogin() {
             inputProps={{ onKeyDown: handleCredentialKeyDown }}
           />
           <Typography component="div" sx={fieldCaseHintSx}>
-            Email, phone — not case sensitive
+            Email, phone or member # (e.g. M1234567) — not case sensitive
           </Typography>
         </Box>
         <Box
@@ -537,7 +537,7 @@ export default function AuthLogin() {
             The reset flow looks the account up by email only, so Google-created accounts get the email too.
           </ColorTemplate7PopupLargeDark.BodyText>
           <ColorTemplate7PopupLargeDark.BodyText>
-            After either one, you can sign in with <strong>Email or Phone + Password</strong>, and{' '}
+            After either one, you can sign in with <strong>Email, Phone or Member # + Password</strong>, and{' '}
             <strong>Sign in with Google</strong> still works on the same account. Both methods end up in the same
             member record.
           </ColorTemplate7PopupLargeDark.BodyText>

@@ -12,7 +12,7 @@ export default function SiteFooterCopyright({ version = 'v2', sx = {} }) {
         ...sx
       }}
     >
-      © {version} 2026 TutaMall.com (DBA), San Francisco, CA
+      © {version} 2026 TutaMall.com, San Francisco, CA
     </Typography>
   );
 }

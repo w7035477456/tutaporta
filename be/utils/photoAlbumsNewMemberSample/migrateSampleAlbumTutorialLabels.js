@@ -37,6 +37,15 @@ export function stripSampleAlbumTutorialLabels(bodyHtml) {
   return String(bodyHtml ?? '').replace(SAMPLE_TUTORIAL_LABEL_RE, '');
 }
 
+/** Plain-text leftovers of the retired hints (not shown in the album, but counted and searched). */
+const SAMPLE_HINT_PARAGRAPH_RE =
+  /<p>\s*(?:Double me to edit photo|You can add\/play Video \(mp4\) files on Album also)\s*<\/p>(?:<p><\/p>)?/g;
+
+/** Remove hint labels and their plain-text leftovers (used when exporting the template). */
+export function stripSampleAlbumHintText(bodyHtml) {
+  return stripSampleAlbumTutorialLabels(bodyHtml).replace(SAMPLE_HINT_PARAGRAPH_RE, '');
+}
+
 /**
  * Strip the retired tutorial hint labels from SAMPLE ALBUM. Safe no-op when
  * none are present or the body is inner-encrypted.
