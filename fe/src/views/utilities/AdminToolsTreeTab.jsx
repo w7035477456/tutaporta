@@ -436,7 +436,7 @@ export default function AdminToolsTreeTab({ onError }) {
   const [expanded, setExpanded] = useState({ large: new Set(), fast: new Set() });
   const [files, setFiles] = useState({ large: {}, fast: {} });
   const [preview, setPreview] = useState(null);
-  /** { key: 'notes'|'photoalbums'|null, dir: 'original'|'desc'|'asc' } */
+  /** { key: 'notes'|'photoalbums'|'tutadates'|null, dir: 'original'|'desc'|'asc' } */
   const [sizeSort, setSizeSort] = useState({ key: null, dir: 'original' });
 
   const load = useCallback(async () => {
@@ -535,6 +535,9 @@ export default function AdminToolsTreeTab({ onError }) {
         </SelectedButtonTemplate>
         <SelectedButtonTemplate type="button" disabled={busy || !trees} onClick={() => cycleSizeSort('photoalbums')} sizeButtonToLabel>
           {sizeSortButtonLabel('Sort Photos Size', 'photoalbums', sizeSort)}
+        </SelectedButtonTemplate>
+        <SelectedButtonTemplate type="button" disabled={busy || !trees} onClick={() => cycleSizeSort('tutadates')} sizeButtonToLabel>
+          {sizeSortButtonLabel('Sort tutaDates Size', 'tutadates', sizeSort)}
         </SelectedButtonTemplate>
         <ColorTemplate9TableData.BodyText sx={{ ...pathLabelSx, opacity: 0.7 }}>
           Click a folder to expand / collapse and list its files. Click a file to preview it.
