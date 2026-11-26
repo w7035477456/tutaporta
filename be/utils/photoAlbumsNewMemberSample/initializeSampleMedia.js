@@ -12,7 +12,7 @@ import {
   photoAlbumsExtensionRequiresJpegFullFile
 } from '../photoAlbumsAttachmentVariants.js';
 import { isPhotoAlbumsStagingVideoExtension } from '../photoAlbumsFileFormats.js';
-import { openVaultBuffer, sealVaultBuffer } from '../photoAlbumsUsb/vaultCrypto.js';
+import { sealVaultBuffer } from '../photoAlbumsUsb/vaultCrypto.js';
 import { vaultFileStoragePath } from '../photoAlbumsUsb/vaultPaths.js';
 import { PHOTO_ALBUMS_VAULT_TABLES } from '../photoAlbumsUsb/vaultPgStore.js';
 import {
@@ -176,7 +176,11 @@ export function readInitializeSampleVaultBuffer(relativePath, key = null) {
     plain = readPlainFile(sourceFilePath(entry));
   }
   if (!plain?.length) return null;
-  return openVaultBuffer(plain, key);
+  // The shared store (originals + .variants cache) is always plaintext. Running it through
+  // openVaultBuffer with an encrypted vault's key tried to decrypt plain bytes and failed, so a
+  // demo photo with no sealed copy in the member's vault (e.g. demo login M4024129, photo 1) broke.
+  void key;
+  return plain;
 }
 
 /**

@@ -1,11 +1,12 @@
 {
-  "note": "SHA-256 of earlier sampleAlbumBody.html versions (and with retired tutorial labels stripped). A member SAMPLE ALBUM whose body matches one of these was never edited, so applySampleAlbumTemplateToMembers.mjs may replace it. Also: M4024129 SAMPLE ALBUM as designed on 2026-11-26 (the current layout plus invisible hint-text leftovers).",
+  "note": "SHA-256 of earlier sampleAlbumBody.html versions (and with retired tutorial labels stripped). A member SAMPLE ALBUM whose body matches one of these was never edited, so applySampleAlbumTemplateToMembers.mjs may replace it. Also: M4024129 SAMPLE ALBUM as designed on 2026-11-26 (the current layout plus invisible hint-text leftovers). Also: the 2026-11-26 M4024129 template (layout without text), replaced by the M1410559 album.",
   "sha256": [
     "6e7222203a2bcb7ddd72e3e64062b97776d7435951dd41b0c3b0749e6965823f",
     "b0a8332411f7064af6dbcd5130f448214e3b1998a89107282f287abd5368831e",
     "6ae13c41981bee2a29b37d2f15fa80346893f6c285e6ff07c70f0d22e82e6199",
     "9b8d99975a1f3a75dae05aebe99366c5f13e3c1aac6a450c71898185202d1034",
     "6916a9d77f93e1c76da2b09c5a99ff89eaccd21418e7ad3ad83c7b5b865ff419",
-    "4e9df6e2ec60b419db64956336d75a9bfdfebccd679a97918eded63f8f44cd53"
+    "4e9df6e2ec60b419db64956336d75a9bfdfebccd679a97918eded63f8f44cd53",
+    "63cbf0658221cd9f335529fab04ed6a8daa12891638e068edede430f3b501ed4"
   ]
 }
