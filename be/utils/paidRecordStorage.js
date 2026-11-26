@@ -7,8 +7,48 @@ import {
   ensureTutaDriveMemberLayout
 } from './tutaDriveMemberPaths.js';
 import { ensurePathWritableOrThrow } from './appStorageFolderPerms.js';
+import { encryptBuffer, decryptBuffer } from './recordVaultUsb/vaultCrypto.js';
+import { getVaultEnvSecret } from './vaultKeys.js';
 
 const BILL_RECEIPTS_DIR = 'bill_receipts';
+/** Sealed receipt files end in `.enc`; older plaintext files (no suffix) are still readable. */
+export const BILL_RECEIPT_SEALED_SUFFIX = '.enc';
+
+/**
+ * At-rest key for bill receipts: HKDF over TEMPKEY_TUTADRIVE with a fixed label.
+ * Deliberately independent of notes/TutaNotes/vault.meta.json — wiping or re-creating the
+ * TutaNotes vault (new kdfSalt) must not make receipts unreadable.
+ */
+let cachedReceiptKey = null;
+let cachedReceiptSecret = null;
+export function billReceiptKey() {
+  const secret = getVaultEnvSecret('tutaCloud');
+  if (cachedReceiptKey && cachedReceiptSecret === secret) return cachedReceiptKey;
+  cachedReceiptKey = Buffer.from(
+    crypto.hkdfSync('sha256', Buffer.from(secret, 'utf8'), 'tutamall-bill-receipts', 'aes-256-gcm v1', 32)
+  );
+  cachedReceiptSecret = secret;
+  return cachedReceiptKey;
+}
+
+export function isSealedBillReceiptPath(p) {
+  return String(p || '').endsWith(BILL_RECEIPT_SEALED_SUFFIX);
+}
+
+export function sealBillReceiptBuffer(plain) {
+  return encryptBuffer(Buffer.isBuffer(plain) ? plain : Buffer.from(plain), billReceiptKey());
+}
+
+export function openBillReceiptBuffer(sealed) {
+  return decryptBuffer(sealed, billReceiptKey());
+}
+
+/** Write via temp file + rename so a crash never leaves a half-written receipt. */
+export function atomicWriteReceiptFile(absPath, buffer) {
+  const tmp = `${absPath}.tmp-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+  fs.writeFileSync(tmp, buffer);
+  fs.renameSync(tmp, absPath);
+}
 
 function sanitizeFileName(raw) {
   const base = path.basename(String(raw || 'file').trim() || 'file');
@@ -72,9 +112,10 @@ export async function writePaidRecordAttachmentFile(singlesId, paidRecordId, { b
     throw new Error('Empty file');
   }
   const { notesMount, absDir } = await ensureBillReceiptsDir(singlesId, paidRecordId);
-  const storedFileName = uniqueStoredName(originalFileName);
+  // Encrypted at rest: on-disk (and stored_file_name / relative_path) name ends in `.enc`.
+  const storedFileName = `${uniqueStoredName(originalFileName)}${BILL_RECEIPT_SEALED_SUFFIX}`;
   const absPath = path.join(absDir, storedFileName);
-  fs.writeFileSync(absPath, buffer);
+  atomicWriteReceiptFile(absPath, sealBillReceiptBuffer(buffer));
   const relativePath = billReceiptRelativePath(paidRecordId, storedFileName);
   return {
     storedFileName,
@@ -108,7 +149,15 @@ export async function readPaidRecordAttachmentFile(singlesId, relativePath) {
     err.statusCode = 404;
     throw err;
   }
-  return { absPath, buffer: fs.readFileSync(absPath) };
+  const raw = fs.readFileSync(absPath);
+  if (!isSealedBillReceiptPath(absPath)) return { absPath, buffer: raw };
+  try {
+    return { absPath, buffer: openBillReceiptBuffer(raw) };
+  } catch {
+    const err = new Error('Attachment could not be decrypted (TEMPKEY_TUTADRIVE changed?)');
+    err.statusCode = 500;
+    throw err;
+  }
 }
 
 export async function deletePaidRecordAttachmentFile(singlesId, relativePath) {
