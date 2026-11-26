@@ -4,14 +4,8 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { MAIN_FONT_FAMILY } from 'config/mainFontEnv';
 import PhotoAlbumsDataPlanDialog from './PhotoAlbumsDataPlanDialog';
-import {
-  reportPhotoAlbumsOverageThrottleDepleted,
-  setPhotoAlbumsOverageThrottleFactor
-} from 'utils/photoAlbumsOverageThrottleUi';
-import {
-  registerPhotoAlbumsDataPlanOpener,
-  setPhotoAlbumsDataPlanDialogOpen
-} from 'utils/photoAlbumsDataPlanGate';
+import { reportPhotoAlbumsOverageThrottleDepleted, setPhotoAlbumsOverageThrottleFactor } from 'utils/photoAlbumsOverageThrottleUi';
+import { registerPhotoAlbumsDataPlanOpener, setPhotoAlbumsDataPlanDialogOpen } from 'utils/photoAlbumsDataPlanGate';
 import { registerPhotoAlbumsUsageRefresher } from 'utils/photoAlbumsUsageRefreshGate';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/PhotoAlbumsOverageThrottleNotice';
 import { formatUsageDataAmount } from 'ui-component/AdminEditableUsageDataAmount';
@@ -103,10 +97,7 @@ function tutaPhotosStorageMb(usage) {
 
 function StorageAndLastClickRow({ usage }) {
   const storageMb = tutaPhotosStorageMb(usage);
-  const title =
-    storageMb == null
-      ? ''
-      : `TutaPhotos storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk`;
+  const title = storageMb == null ? '' : `TutaPhotos storage ${formatUsageDataAmount(storageMb, { precisionGb: 2 })} on disk`;
   return (
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0 }}>
       {storageMb == null ? null : <UsageStoragePill storageMb={storageMb} title={title} />}
@@ -154,7 +145,8 @@ export default function PhotoAlbumsUsageBar({
       return reportPhotoAlbumsOverageThrottleDepleted(false);
     }
     const refillRemainMb = displayRemainMb(transfer);
-    const depleted = Boolean(transfer.overageThrottled) || refillRemainMb <= 0;
+    // Demo / guest login is never throttled (no queue popup, no "speed throttled").
+    const depleted = !transfer.demoUnthrottled && (Boolean(transfer.overageThrottled) || refillRemainMb <= 0);
     // Publish the live multiple so every throttle notice shows the same number.
     setPhotoAlbumsOverageThrottleFactor(resolveVisibleThrottleFactor(transfer.throttleFactor, depleted));
     return reportPhotoAlbumsOverageThrottleDepleted(depleted);
@@ -176,12 +168,12 @@ export default function PhotoAlbumsUsageBar({
         </SliderControlButton>
       ) : null}
       <WorkspaceVideoTutorialPair
-      videoTutorialUrl={String(videoTutorialUrl || '').trim() || DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL}
-      onTutorialClick={() => openPhotoAlbumsContextTutorialPopout()}
-      tutorialVariant="orange"
-      tutorialAriaLabel="Open context tutorial"
-      tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
-      sx={{ ml: 0 }}
+        videoTutorialUrl={String(videoTutorialUrl || '').trim() || DEFAULT_PHOTO_ALBUMS_WATCH_TUTORIALS_URL}
+        onTutorialClick={() => openPhotoAlbumsContextTutorialPopout()}
+        tutorialVariant="orange"
+        tutorialAriaLabel="Open context tutorial"
+        tutorialTitle="Open context tutorial in a floating window (stays in sync; drag to another monitor)"
+        sx={{ ml: 0 }}
       />
     </>
   );
@@ -218,11 +210,9 @@ export default function PhotoAlbumsUsageBar({
   }
 
   const refillRemainMb = displayRemainMb(transfer);
-  const depleted = Boolean(transfer.overageThrottled) || refillRemainMb <= 0;
-  const refillBoughtMb =
-    transfer.refillBoughtMb != null
-      ? Number(transfer.refillBoughtMb)
-      : Number(transfer.refillBlockMb) || 10 * 1024;
+  // Demo / guest login is never throttled (no queue popup, no "speed throttled").
+  const depleted = !transfer.demoUnthrottled && (Boolean(transfer.overageThrottled) || refillRemainMb <= 0);
+  const refillBoughtMb = transfer.refillBoughtMb != null ? Number(transfer.refillBoughtMb) : Number(transfer.refillBlockMb) || 10 * 1024;
   const refillBlockMb = Number(transfer.refillBlockMb) || 10 * 1024;
   const blockLabel = formatUsageDataAmount(refillBlockMb);
   const throttleFactor = resolveVisibleThrottleFactor(transfer.throttleFactor, depleted);

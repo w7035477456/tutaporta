@@ -82,3 +82,44 @@ export async function migrateSampleAlbumTutorialLabelsDb(db) {
   });
   return { migrated: true, noteId };
 }
+
+/**
+ * Demo album photos seeded before the demoOnly_ rename keep their old display name
+ * (photo1.jpg). Rename rows that still match a manifest photo by checksum AND the untouched
+ * legacy name to the manifest name (demoOnly_photo1.jpg), then refresh SAMPLE ALBUM search text.
+ *
+ * @param {import('../photoAlbumsUsb/vaultPgStore.js').VaultPgDb} db
+ * @returns {Promise<{ renamed: number }>}
+ */
+export async function migrateSampleAlbumDemoOnlyNamesDb(db) {
+  const manifest = loadInitializeSampleManifest();
+  let renamed = 0;
+  await db.tx(async (tx) => {
+    for (const att of manifest.attachments || []) {
+      const legacy = String(att.legacyFileName || '').trim();
+      const next = String(att.fileName || '').trim();
+      const checksum = String(att.checksum || '').trim();
+      if (!legacy || !next || legacy === next || !checksum) continue;
+      renamed +=
+        Number(
+          await tx.run(
+            `UPDATE ${T.attachments} SET file_name = $4
+              WHERE singles_id = $1 AND checksum = $2 AND file_name = $3`,
+            [tx.singlesId, checksum, legacy, next]
+          )
+        ) || 0;
+    }
+    if (!renamed) return;
+    const albumName = manifest.albumName || DEFAULT_SAMPLE_ALBUM_NAME;
+    const note = await tx.one(
+      `SELECT note_id, body_text, inner_encrypt_enabled FROM ${T.notes}
+        WHERE singles_id = $1 AND note_name = $2 AND deleted_at IS NULL ORDER BY note_id ASC LIMIT 1`,
+      [tx.singlesId, albumName]
+    );
+    const body = String(note?.body_text || '');
+    if (note && Number(note.inner_encrypt_enabled) !== 1 && !body.startsWith(NOTE_INNER_ENCRYPT_BODY_PREFIX)) {
+      await refreshSampleAlbumSearchText(tx, Number(note.note_id), albumName, body);
+    }
+  });
+  return { renamed };
+}

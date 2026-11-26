@@ -44,7 +44,8 @@ export function resolveRecordVaultSharedContentKey({ sharedContentKey, checksum,
     .toLowerCase();
   if (name) {
     for (const att of listRecordVaultSampleAttachmentDefs()) {
-      if (String(att.fileName || '').toLowerCase() === name) return String(att.sharedKey || '').trim();
+      const names = [att.fileName, att.legacyFileName].map((n) => String(n || '').toLowerCase());
+      if (names.includes(name)) return String(att.sharedKey || '').trim();
     }
   }
   return null;

@@ -1,4 +1,5 @@
 import pool from '../db/connection.js';
+import { isDemoGuestTargetEmail } from './demoGuestLoginAlias.js';
 import {
   clusterRedisGetInt,
   clusterRedisIncrBy,
@@ -119,6 +120,8 @@ export async function addVaultRefillMb(singlesId, addMb) {
  */
 export async function isVaultTransferQuotaExhausted(singlesId) {
   const stats = await getVaultTransferStats(singlesId);
+  // Demo / guest login accounts are never throttled.
+  if (stats.demoUnthrottled) return false;
   return (Number(stats.refillRemainMb) || 0) <= 0;
 }
 
@@ -195,13 +198,14 @@ export async function getVaultTransferStats(singlesId) {
   const id = Math.trunc(Number(singlesId));
   try {
     const { rows } = await pool.query(
-      `SELECT photoalbums_total_transfer_mb, refill_remain_mb, refill_bought_mb
+      `SELECT photoalbums_total_transfer_mb, refill_remain_mb, refill_bought_mb, email
          FROM outdateddbsnapshotoct2024.singles
         WHERE singles_id = $1
         LIMIT 1`,
       [singlesId]
     );
     const usedMb = Number(rows[0]?.photoalbums_total_transfer_mb) || 0;
+    const demoUnthrottled = isDemoGuestTargetEmail(rows[0]?.email);
     let refillRemainMb = Number(rows[0]?.refill_remain_mb);
     if (!Number.isFinite(refillRemainMb)) refillRemainMb = initialDataMb;
     let refillBoughtMb = Number(rows[0]?.refill_bought_mb);
@@ -232,9 +236,11 @@ export async function getVaultTransferStats(singlesId) {
       pendingTransferBytes: pendingBytes,
       refillBoughtMb,
       refillBlockMb: VAULT_REFILL_BLOCK_MB,
-      overageThrottled: remainBytes <= 0,
+      overageThrottled: !demoUnthrottled && remainBytes <= 0,
       /** Current transfer slowdown multiple: 1 at full speed, else the throttle multiple. */
-      throttleFactor: remainBytes <= 0 ? VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR : 1
+      throttleFactor: !demoUnthrottled && remainBytes <= 0 ? VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR : 1,
+      /** Demo / guest login: no throttle, no traffic-wait queue. */
+      demoUnthrottled
     };
   } catch (err) {
     console.warn('[vault-transfer] stats unavailable:', err?.message || err);

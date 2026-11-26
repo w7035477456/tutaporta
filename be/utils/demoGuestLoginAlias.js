@@ -8,6 +8,14 @@
 const DEMO_LOGIN_TARGET_EMAIL = 'dm2@gmail.com';
 const GUEST_LOGIN_TARGET_EMAIL = 'dm4@gmail.com';
 
+/** True for the singles accounts behind the demo / guest aliases (never Tx/Rx throttled). */
+export function isDemoGuestTargetEmail(email) {
+  const e = String(email ?? '')
+    .trim()
+    .toLowerCase();
+  return e === DEMO_LOGIN_TARGET_EMAIL || e === GUEST_LOGIN_TARGET_EMAIL;
+}
+
 /**
  * @param {string} loginId
  * @param {string} password

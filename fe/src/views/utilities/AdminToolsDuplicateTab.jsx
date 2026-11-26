@@ -10,7 +10,12 @@ import { adminStorageTreeFileUrl, fetchAdminStorageDuplicates, removeAdminStorag
 const THUMB_PX = 56;
 const ROOT_LABEL = { fast: 'FAST', large: 'LARGE' };
 const IMAGE_RE = /\.(jpe?g|png|gif|webp|bmp)(\.enc)?$/i;
-const GRID = { xs: `${THUMB_PX}px 1fr`, sm: `${THUMB_PX}px 2.6fr 0.9fr 1.6fr 0.8fr` };
+const GRID = {
+  xs: `${THUMB_PX + 20}px minmax(0, 1fr)`,
+  sm: `${THUMB_PX + 20}px minmax(0, 2.6fr) minmax(0, 0.9fr) minmax(0, 1.6fr) minmax(0, 0.9fr)`
+};
+/** Table body text is nowrap by default; long paths and reasons must wrap inside their own column. */
+const WRAP = { whiteSpace: 'normal', overflowWrap: 'anywhere', minWidth: 0 };
 
 function statusOf(file) {
   if (file.keep) return { label: 'Keep', color: 'var(--theme-primary-color)' };
@@ -66,22 +71,22 @@ function GroupTable({ group, busy, disabled, onRemove }) {
               <ColorTemplate9TableData.BodyCell>
                 <Thumb file={file} />
               </ColorTemplate9TableData.BodyCell>
-              <ColorTemplate9TableData.BodyCell sx={{ flexDirection: 'column', alignItems: 'flex-start' }}>
-                <ColorTemplate9TableData.BodyText sx={{ fontWeight: 600, wordBreak: 'break-all' }}>
+              <ColorTemplate9TableData.BodyCell sx={{ flexDirection: 'column', alignItems: 'flex-start', overflow: 'hidden' }}>
+                <ColorTemplate9TableData.BodyText sx={{ ...WRAP, fontWeight: 600 }}>
                   {ROOT_LABEL[file.rootKey] || file.rootKey}: {file.treePath}
                 </ColorTemplate9TableData.BodyText>
-                <ColorTemplate9TableData.BodyText sx={{ display: { xs: 'block', sm: 'none' }, color: status.color }}>
+                <ColorTemplate9TableData.BodyText sx={{ ...WRAP, display: { xs: 'block', sm: 'none' }, color: status.color }}>
                   {file.kind} · {status.label}
                 </ColorTemplate9TableData.BodyText>
               </ColorTemplate9TableData.BodyCell>
               <ColorTemplate9TableData.BodyCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-                <ColorTemplate9TableData.BodyText>{file.kind}</ColorTemplate9TableData.BodyText>
+                <ColorTemplate9TableData.BodyText sx={WRAP}>{file.kind}</ColorTemplate9TableData.BodyText>
               </ColorTemplate9TableData.BodyCell>
               <ColorTemplate9TableData.BodyCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-                <ColorTemplate9TableData.BodyText sx={{ wordBreak: 'break-word' }}>{file.usedBy || '—'}</ColorTemplate9TableData.BodyText>
+                <ColorTemplate9TableData.BodyText sx={WRAP}>{file.usedBy || '—'}</ColorTemplate9TableData.BodyText>
               </ColorTemplate9TableData.BodyCell>
               <ColorTemplate9TableData.BodyCell sx={{ display: { xs: 'none', sm: 'flex' } }}>
-                <ColorTemplate9TableData.BodyText sx={{ color: status.color, fontWeight: 700 }}>
+                <ColorTemplate9TableData.BodyText sx={{ ...WRAP, color: status.color, fontWeight: 700 }}>
                   {status.label}
                 </ColorTemplate9TableData.BodyText>
               </ColorTemplate9TableData.BodyCell>

@@ -377,6 +377,29 @@ async function relinkCanonicalAttachmentsToSharedKeys(db) {
   return updated;
 }
 
+/**
+ * Demo attachments seeded before the demoOnly_ rename keep their old display name
+ * (e.g. f1040.pdf). Rename them to the manifest name (demoOnly_f1040.pdf) — only rows that
+ * still carry the demo shared_content_key AND the untouched legacy name.
+ * @returns {Promise<number>} rows renamed
+ */
+async function renameLegacySampleAttachmentNames(db) {
+  let renamed = 0;
+  for (const att of listRecordVaultSampleAttachmentDefs()) {
+    const key = String(att.sharedKey || '').trim();
+    const legacy = String(att.legacyFileName || '').trim();
+    const next = String(att.fileName || '').trim();
+    if (!key || !legacy || !next || legacy === next) continue;
+    const res = await db.run(
+      `UPDATE ${T.attachments} SET file_name = $4
+        WHERE singles_id = $1 AND shared_content_key = $2 AND file_name = $3 AND deleted_at IS NULL`,
+      [db.singlesId, key, legacy, next]
+    );
+    renamed += Number(res) || 0; // VaultPgDb.run returns rowCount
+  }
+  return renamed;
+}
+
 /** True when a live note row is the bundled default sample (safe to refresh body from manifest). */
 function isBundledDefaultSampleNoteRow(row, noteDef) {
   const body = String(row?.body_text || '');
@@ -589,9 +612,10 @@ export async function ensureRecordVaultNewMemberSampleDb(db, { allowSeed = true 
     const purgedOrphans = await purgeOrphanedLegacySampleNotes(tx);
     const purged = await purgeGarbageRecordVaultV1SampleNotes(tx);
     const relinked = await relinkCanonicalAttachmentsToSharedKeys(tx);
+    const renamedDemo = await renameLegacySampleAttachmentNames(tx);
     const bodiesSynced = await upgradeCanonicalSampleNoteBodies(tx);
     const purgedAny = purgedLegacyNb1 > 0 || purgedV2 > 0 || purgedOrphans > 0 || purged > 0;
-    const changedMeta = purgedAny || relinked > 0 || bodiesSynced > 0;
+    const changedMeta = purgedAny || relinked > 0 || renamedDemo > 0 || bodiesSynced > 0;
     const unchanged = changedMeta ? 'upgraded' : 'present';
 
     if (await vaultAlreadyHasNewMemberSample(tx)) return unchanged;

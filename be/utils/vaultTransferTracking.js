@@ -1,4 +1,5 @@
 import pool from '../db/connection.js';
+import { isDemoGuestTargetEmail } from './demoGuestLoginAlias.js';
 import {
   clusterRedisGetInt,
   clusterRedisIncrBy,
@@ -106,6 +107,8 @@ export async function addVaultRefillMb(singlesId, addMb) {
  */
 export async function isVaultTransferQuotaExhausted(singlesId) {
   const stats = await getVaultTransferStats(singlesId);
+  // Demo / guest login accounts are never throttled.
+  if (stats.demoUnthrottled) return false;
   return (Number(stats.refillRemainMb) || 0) <= 0;
 }
 
@@ -202,13 +205,14 @@ export async function getVaultTransferStats(singlesId) {
   const id = Math.trunc(Number(singlesId));
   try {
     const { rows } = await pool.query(
-      `SELECT notes_total_transfer_mb, refill_remain_mb, refill_bought_mb
+      `SELECT notes_total_transfer_mb, refill_remain_mb, refill_bought_mb, email
          FROM outdateddbsnapshotoct2024.singles
         WHERE singles_id = $1
         LIMIT 1`,
       [singlesId]
     );
     const usedMb = Number(rows[0]?.notes_total_transfer_mb) || 0;
+    const demoUnthrottled = isDemoGuestTargetEmail(rows[0]?.email);
     let refillRemainMb = Number(rows[0]?.refill_remain_mb);
     if (!Number.isFinite(refillRemainMb)) refillRemainMb = initialDataMb;
     let refillBoughtMb = Number(rows[0]?.refill_bought_mb);
@@ -219,7 +223,8 @@ export async function getVaultTransferStats(singlesId) {
     }
     const refillRemainMbExact = refillRemainMb - pendingBytes / BYTES_PER_MB;
     refillRemainMb = Math.floor(refillRemainMbExact);
-    const overageThrottled = refillRemainMbExact <= 0;
+    // Demo / guest login accounts are never throttled.
+    const overageThrottled = !demoUnthrottled && refillRemainMbExact <= 0;
     const leftMb = refillRemainMb;
     const leftPct =
       initialDataMb > 0
@@ -241,7 +246,8 @@ export async function getVaultTransferStats(singlesId) {
       refillBlockMb: VAULT_REFILL_BLOCK_MB,
       overageThrottled,
       /** Current transfer slowdown multiple: 1 at full speed, NOTES_OVERLIMIT_THROTTLE_MULTIPLE when depleted. */
-      throttleFactor: overageThrottled ? VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR : 1
+      throttleFactor: overageThrottled ? VAULT_TRANSFER_OVERAGE_THROTTLE_FACTOR : 1,
+      demoUnthrottled
     };
   } catch (err) {
     console.warn('[vault-transfer] stats unavailable:', err?.message || err);

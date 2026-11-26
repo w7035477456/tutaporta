@@ -14,10 +14,7 @@ import {
 } from './tutaNotesBranding';
 import RecordVaultDataPlanDialog from './RecordVaultDataPlanDialog';
 import TutaNotesWelcomeTutorialPopup from './TutaNotesWelcomeTutorialPopup';
-import {
-  reportRecordVaultOverageThrottleDepleted,
-  setRecordVaultOverageThrottleFactor
-} from 'utils/recordVaultOverageThrottleUi';
+import { reportRecordVaultOverageThrottleDepleted, setRecordVaultOverageThrottleFactor } from 'utils/recordVaultOverageThrottleUi';
 import { useLastClickTransferMb } from 'utils/lastClickTransferMeter';
 import { VaultOverageSpeedThrottledPhrase } from 'ui-component/VaultOverageThrottleNotice';
 import AdminEditableUsageDataAmount, {
@@ -81,11 +78,7 @@ UsageBarShell.propTypes = {
 export function LastClickTransferLabel() {
   const mb = useLastClickTransferMb();
   return (
-    <Typography
-      component="span"
-      sx={yellowTextSx}
-      title="Data moved between server and browser by your last click"
-    >
+    <Typography component="span" sx={yellowTextSx} title="Data moved between server and browser by your last click">
       {formatUsageDataAmount(mb)}
     </Typography>
   );
@@ -239,8 +232,7 @@ export function UsageMeter({ usedMb, boughtMb, remainMb, blockLabel, depleted, o
   const showUsed = used > 0;
   const showRemain = remain > 0 || !showUsed;
   const fmt = (mb) => formatUsageDataAmount(mb, { precisionGb: 2 });
-  const title =
-    `Used ${fmt(used)} · ${fmt(remain)} left of ${fmt(bought)}. Click to Refill/Add ${blockLabel} blocks.`;
+  const title = `Used ${fmt(used)} · ${fmt(remain)} left of ${fmt(bought)}. Click to Refill/Add ${blockLabel} blocks.`;
   const openPlan = (event) => {
     if (event.target instanceof Element && event.target.closest('[data-admin-usage-amount]')) return;
     onOpenPlan();
@@ -372,34 +364,24 @@ AddMoreGbLink.propTypes = {
   onClick: PropTypes.func.isRequired
 };
 
-export default function RecordVaultUsageBar({
-  usage,
-  storageType = 'usb',
-  videoTutorialUrl = '',
-  onPurchased,
-  onGetMoreTokens
-}) {
+export default function RecordVaultUsageBar({ usage, storageType = 'usb', videoTutorialUrl = '', onPurchased, onGetMoreTokens }) {
   const [dataPlanOpen, setDataPlanOpen] = useState(false);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const transfer = usage?.transfer;
   const isOneDrive = storageType === 'tutaCloud';
-  const tutorialDetail = isOneDrive
-    ? TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL
-    : TUTANOTES_USB_VIDEO_TUTORIAL_LABEL;
+  const tutorialDetail = isOneDrive ? TUTANOTES_ONEDRIVE_VIDEO_TUTORIAL_LABEL : TUTANOTES_USB_VIDEO_TUTORIAL_LABEL;
 
   useEffect(() => {
     if (!transfer) {
       setRecordVaultOverageThrottleFactor(1);
       return reportRecordVaultOverageThrottleDepleted(false);
     }
-    const refillRemainMb =
-      transfer.refillRemainMb != null ? Number(transfer.refillRemainMb) : Number(transfer.leftMb) || 0;
-    const depleted = Boolean(transfer.overageThrottled) || refillRemainMb <= 0;
+    const refillRemainMb = transfer.refillRemainMb != null ? Number(transfer.refillRemainMb) : Number(transfer.leftMb) || 0;
+    // Demo / guest login is never throttled (no queue popup, no "speed throttled").
+    const depleted = !transfer.demoUnthrottled && (Boolean(transfer.overageThrottled) || refillRemainMb <= 0);
     // Publish the live multiple so every throttle notice ("speed throttled 10x")
     // shows the same number the backend is actually applying.
-    setRecordVaultOverageThrottleFactor(
-      resolveVisibleThrottleFactor(transfer.throttleFactor, depleted)
-    );
+    setRecordVaultOverageThrottleFactor(resolveVisibleThrottleFactor(transfer.throttleFactor, depleted));
     return reportRecordVaultOverageThrottleDepleted(depleted);
   }, [transfer]);
 
@@ -461,13 +443,10 @@ export default function RecordVaultUsageBar({
     );
   }
 
-  const refillRemainMb =
-    transfer.refillRemainMb != null ? Number(transfer.refillRemainMb) : Number(transfer.leftMb) || 0;
-  const depleted = Boolean(transfer.overageThrottled) || refillRemainMb <= 0;
-  const refillBoughtMb =
-    transfer.refillBoughtMb != null
-      ? Number(transfer.refillBoughtMb)
-      : Number(transfer.refillBlockMb) || 10 * 1024;
+  const refillRemainMb = transfer.refillRemainMb != null ? Number(transfer.refillRemainMb) : Number(transfer.leftMb) || 0;
+  // Demo / guest login is never throttled (no queue popup, no "speed throttled").
+  const depleted = !transfer.demoUnthrottled && (Boolean(transfer.overageThrottled) || refillRemainMb <= 0);
+  const refillBoughtMb = transfer.refillBoughtMb != null ? Number(transfer.refillBoughtMb) : Number(transfer.refillBlockMb) || 10 * 1024;
   const refillBlockMb = Number(transfer.refillBlockMb) || 10 * 1024;
   const blockLabel = formatUsageDataAmount(refillBlockMb);
 

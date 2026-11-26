@@ -1618,7 +1618,8 @@ export async function fetchRecordVaultUsage({ storageType } = {}) {
           refillBlockMb: Number(data.transfer.refillBlockMb) || 10 * 1024,
           overageThrottled: Boolean(data.transfer.overageThrottled),
           throttleFactor: Number(data.transfer.throttleFactor) || 1,
-          unavailable: Boolean(data.transfer.unavailable)
+          unavailable: Boolean(data.transfer.unavailable),
+          demoUnthrottled: Boolean(data.transfer.demoUnthrottled)
         }
       : null,
     sessionFileCounts: {

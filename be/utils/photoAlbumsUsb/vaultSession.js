@@ -50,7 +50,10 @@ import {
   seedPhotoAlbumsNewMemberSampleDb,
   seedPhotoAlbumsNewMemberSampleMedia
 } from '../photoAlbumsNewMemberSample/seedPhotoAlbumsNewMemberSample.js';
-import { migrateSampleAlbumTutorialLabelsDb } from '../photoAlbumsNewMemberSample/migrateSampleAlbumTutorialLabels.js';
+import {
+  migrateSampleAlbumDemoOnlyNamesDb,
+  migrateSampleAlbumTutorialLabelsDb
+} from '../photoAlbumsNewMemberSample/migrateSampleAlbumTutorialLabels.js';
 import {
   readInitializeSampleVaultBuffer,
   isBundledInitializeSampleAttachmentId,
@@ -770,6 +773,14 @@ export async function unlockVaultUsbWithKey(singlesId, mountPath, key, options =
     console.info(
       `[unlockVaultUsbWithKey] removed SAMPLE ALBUM tutorial labels singles_id=${singlesId} note_id=${sampleLabelMigrate.noteId}`
     );
+  }
+  try {
+    const demoNames = await migrateSampleAlbumDemoOnlyNamesDb(session.db);
+    if (demoNames.renamed) {
+      console.info(`[unlockVaultUsbWithKey] renamed ${demoNames.renamed} demo album photo(s) to demoOnly_ singles_id=${singlesId}`);
+    }
+  } catch (err) {
+    console.error('[unlockVaultUsbWithKey] demoOnly_ rename failed', err?.message || err);
   }
 
   fs.mkdirSync(vaultFilesRoot(session.mountPath), { recursive: true });

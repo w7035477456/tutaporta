@@ -315,7 +315,7 @@ export async function restorePhotoAlbumsSampleAlbumDb(db) {
           !keepIds.has(Number(row.attachment_id)) &&
           att.checksum &&
           row.checksum === att.checksum &&
-          row.file_name === att.fileName
+          (row.file_name === att.fileName || (att.legacyFileName && row.file_name === att.legacyFileName))
       );
       if (relocated) {
         const vaultId = Number(relocated.attachment_id);
